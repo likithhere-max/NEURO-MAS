@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # the SQLAlchemy models are written to be portable across both.
     database_url: str = "sqlite:///./neuromas.db"
 
+    # --- Supabase ---
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
+    supabase_secret_key: str = ""
+
     # --- Auth ---
     secret_key: str = "CHANGE_ME_INSECURE_DEV_ONLY_SECRET_KEY"
     access_token_expire_minutes: int = 60 * 8
