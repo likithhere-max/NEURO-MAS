@@ -1,0 +1,35 @@
+OFFICIAL / PRIMARY SOURCES
+
+1. WHO ICD-11 Reference Guide
+https://icdcdn.who.int/icd11referenceguide/en/html/index.html
+
+2. WHO ICD-11
+https://icd.who.int/
+
+3. Orphanet / Orphadata
+https://www.orpha.net/
+https://www.orphadata.com/
+
+4. Orphanet July 2026 science datasets
+https://sciences.orphadata.com/
+
+5. Orphanet 2026 nomenclature pack
+https://www.orphacode.org/pack-nomenclature/
+
+6. NINDS neurological disorders
+https://www.ninds.nih.gov/health-information/disorders
+
+LICENSE NOTES
+- Orphadata Science files are available under CC BY 4.0 according to Orphadata.
+- WHO materials have their own reuse terms; verify the applicable license for each asset.
+- Do not copy proprietary clinical guideline text into the dataset. Store source metadata and
+  concise, original structured summaries instead.
+- SNOMED CT has separate licensing requirements; do not redistribute SNOMED content unless
+  your licensing permits it.
+
+WHY TREATMENT IS SEPARATE
+Orphanet's free science datasets provide nomenclature, mappings, classifications, phenotypes,
+genes, epidemiology and natural history. Detailed disease abstracts/treatment resources may
+be part of other Orphanet products or external clinical guidelines. Treatment should therefore
+be populated from current evidence/guidelines with publication date and verification status,
+rather than guessed from disease names.

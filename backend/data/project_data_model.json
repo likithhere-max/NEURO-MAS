@@ -1,0 +1,17 @@
+{
+  "tables": {
+    "diseases": "canonical disease/subtype entity",
+    "disease_aliases": "synonyms and historical names",
+    "phenotypes": "HPO terms linked to disease with frequency",
+    "genes": "gene-disease associations and inheritance",
+    "cross_references": "ICD-10/ICD-11/OMIM/MONDO/MedDRA/GARD/ORPHA",
+    "epidemiology": "prevalence/incidence/age/sex/geography",
+    "natural_history": "onset, progression, complications",
+    "diagnostics": "tests, imaging, biomarkers, diagnostic criteria",
+    "differentials": "disease-to-disease differential relationships",
+    "red_flags": "urgent/emergency warning signs",
+    "treatment_evidence": "guideline-backed interventions",
+    "monitoring": "follow-up parameters and intervals",
+    "sources": "source metadata, date, license, verification state"
+  }
+}

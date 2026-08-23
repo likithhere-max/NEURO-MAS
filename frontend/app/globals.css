@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  background-color: #0b1020;
+  color: #e7ecff;
+}
+
+.card {
+  @apply bg-neuro-panel border border-neuro-border rounded-xl p-4;
+}
+
+.badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+}
+
+.badge-info { @apply bg-neuro-accent/20 text-neuro-accent; }
+.badge-ok { @apply bg-neuro-ok/20 text-neuro-ok; }
+.badge-warn { @apply bg-neuro-warn/20 text-neuro-warn; }
+.badge-high { @apply bg-neuro-high/20 text-neuro-high; }
+.badge-critical { @apply bg-neuro-critical/20 text-neuro-critical; }
