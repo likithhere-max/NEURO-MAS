@@ -1,41 +1,77 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, EmailStr
 
-from app.db.models import User
-from app.db.session import get_db
+from app.core.supabase_client import get_supabase_admin_client, get_supabase_public_client
 from app.schemas.api import Token, UserCreate
-from app.services.auth import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=Token)
-def register(payload: UserCreate, db: Session = Depends(get_db)):
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+@router.post("/signup", response_model=Token)
+def signup(payload: UserCreate):
     if payload.role not in {"clinician", "patient", "caregiver"}:
         raise HTTPException(400, "role must be one of clinician, patient, caregiver")
-    existing = db.query(User).filter(User.email == payload.email).first()
-    if existing:
-        raise HTTPException(400, "email already registered")
-    user = User(
-        email=payload.email,
-        hashed_password=hash_password(payload.password),
-        full_name=payload.full_name,
-        role=payload.role,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    token = create_access_token(user.id, user.role)
-    return Token(access_token=token, role=user.role)
+
+    admin = get_supabase_admin_client()
+    public = get_supabase_public_client()
+
+    try:
+        created = admin.auth.admin.create_user({
+            "email": payload.email,
+            "password": payload.password,
+            "email_confirm": True,  # prototype simplification -- see docs/ROADMAP.md
+        })
+    except Exception as exc:
+        raise HTTPException(400, f"Could not create account: {exc}")
+
+    user_id = created.user.id
+
+    # Sign in as the brand-new user immediately, so the profile insert below
+    # runs AS THEM -- respecting Row Level Security -- instead of using the
+    # admin key to force it through.
+    try:
+        session = public.auth.sign_in_with_password({
+            "email": payload.email,
+            "password": payload.password,
+        })
+    except Exception as exc:
+        raise HTTPException(500, f"Account created but sign-in failed: {exc}")
+
+    public.table("profiles").insert({
+        "id": user_id,
+        "full_name": payload.full_name,
+        "role": payload.role,
+    }).execute()
+
+    return Token(access_token=session.session.access_token, role=payload.role)
 
 
 @router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+def login(payload: LoginRequest):
+    public = get_supabase_public_client()
+
+    try:
+        session = public.auth.sign_in_with_password({
+            "email": payload.email,
+            "password": payload.password,
+        })
+    except Exception:
         raise HTTPException(401, "invalid credentials")
-    token = create_access_token(user.id, user.role)
-    return Token(access_token=token, role=user.role)
+
+    profile = (
+        public.table("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single()
+        .execute()
+    )
+    role = profile.data["role"] if profile.data else "patient"
+
+    return Token(access_token=session.session.access_token, role=role)
