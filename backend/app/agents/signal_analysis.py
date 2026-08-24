@@ -5,14 +5,18 @@ Handles neurological signal modalities (tremor accelerometer summaries, gait
 metrics, EEG/EMG metadata). Per the explicit "do not fake features" rule:
 if a real analysis model isn't wired up for a modality, this agent returns
 MODEL_NOT_AVAILABLE for that modality rather than inventing a prediction.
-
 What it *can* do without a trained model: simple, clearly-labeled threshold
 checks on pre-computed summary metrics (e.g. "tremor_amplitude_hz" already
 extracted upstream by the device/SDK), since that's arithmetic, not inference.
 """
 from __future__ import annotations
 
+import asyncio
+
+from pydantic import BaseModel
+
 from app.agents.base import BaseNeuroAgent
+from app.ai.gemini_service import GeminiServiceError, generate_structured
 from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
 
@@ -23,6 +27,49 @@ SUPPORTED_SUMMARY_METRICS = {"tremor_amplitude", "gait_speed_m_s", "steps", "hea
 # NEURO-MAS does not ship (clinical-grade EEG anomaly detection, video-derived
 # gait classification, voice biomarkers, etc.)
 UNSUPPORTED_MODALITIES = {"eeg_raw", "emg_raw", "video_gait", "voice"}
+
+
+class _SignalNarrative(BaseModel):
+    explanation: str
+
+
+async def _explain_signal_findings_with_gemini(
+    finding_summaries: list[dict],
+    model_not_available: list[str],
+) -> str | None:
+    """Ask Gemini to narrate already-computed threshold findings.
+
+    Gemini receives ONLY the finding labels/details/severities already computed
+    deterministically -- it does not add a finding, change a severity, or
+    invent a value.
+    """
+    prompt = (
+        "A wearable-signal analysis agent computed the following findings via "
+        "simple deterministic threshold checks against the patient's own stored "
+        "baseline (not a trained ML model):\n\n"
+        f"Findings: {finding_summaries}\n"
+        f"Modalities with no available model (raw data stored, no prediction made): "
+        f"{model_not_available if model_not_available else 'none'}\n\n"
+        "Write a short, plain-language paragraph explaining these findings to a "
+        "clinician, referencing only the findings and unavailable-modality list above."
+    )
+    system_instruction = (
+        "You are writing a short explanatory note for a clinician reviewing "
+        "wearable-signal threshold findings. You may ONLY restate and explain the "
+        "findings and modality list given to you. Do NOT invent new findings, "
+        "severities, or values. Do NOT diagnose a condition or suggest a "
+        "clinical action. Keep it to 2-4 sentences."
+    )
+    try:
+        result = await asyncio.to_thread(
+            generate_structured,
+            prompt,
+            _SignalNarrative,
+            system_instruction=system_instruction,
+        )
+        return result.explanation
+    except GeminiServiceError:
+        return None
 
 
 class SignalAnalysisAgent(BaseNeuroAgent):
@@ -91,6 +138,29 @@ class SignalAnalysisAgent(BaseNeuroAgent):
         confidence = 0.55 if findings else 0.0
         status = AgentStatus.COMPLETED if findings or model_not_available else AgentStatus.SKIPPED
 
+        template_summary = (
+            f"Evaluated {len([k for k in wearable if k in SUPPORTED_SUMMARY_METRICS])} supported summary "
+            f"metric(s) via simple threshold comparison against the patient's stored baseline. "
+            f"{len(model_not_available)} modality/modalities had no available model."
+        )
+
+        if status == AgentStatus.COMPLETED:
+            finding_summaries = [
+                {"label": f.label, "detail": f.detail, "severity": f.severity}
+                for f in findings
+            ]
+            narrative = await _explain_signal_findings_with_gemini(finding_summaries, model_not_available)
+            if narrative:
+                reasoning_summary = narrative
+                narrative_source = "gemini"
+            else:
+                reasoning_summary = template_summary
+                narrative_source = "template_fallback"
+                warnings.append("gemini_narrative_unavailable_used_template_summary")
+        else:
+            reasoning_summary = template_summary
+            narrative_source = "not_applicable_no_findings"
+
         return AgentResult(
             agent_name=self.name,
             task_id=task.task_id,
@@ -100,10 +170,6 @@ class SignalAnalysisAgent(BaseNeuroAgent):
             warnings=warnings + ["consumer_wearable_signal_quality_is_NOT_equivalent_to_clinical_EEG_EMG"],
             recommended_next_agents=["longitudinal_agent", "risk_stratification_agent"],
             requires_human_review=any(f.severity in {"high", "critical"} for f in findings),
-            reasoning_summary=(
-                f"Evaluated {len([k for k in wearable if k in SUPPORTED_SUMMARY_METRICS])} supported summary "
-                f"metric(s) via simple threshold comparison against the patient's stored baseline. "
-                f"{len(model_not_available)} modality/modalities had no available model."
-            ),
-            raw_payload={"model_not_available": model_not_available},
+            reasoning_summary=reasoning_summary,
+            raw_payload={"model_not_available": model_not_available, "narrative_source": narrative_source},
         )
