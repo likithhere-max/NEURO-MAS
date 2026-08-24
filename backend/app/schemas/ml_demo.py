@@ -1,6 +1,6 @@
 """
 Roadmap item 6, Track 2: request/response schemas for the standalone
-Parkinson's demonstration classifier endpoint. Deliberately separate from
+Parkinson's demonstration classifier endpoints. Deliberately separate from
 app/schemas/api.py -- these schemas have nothing to do with real patients.
 """
 from __future__ import annotations
@@ -48,4 +48,45 @@ class ParkinsonsPredictionOut(BaseModel):
     predicted_label: str
     probability_parkinsons: float
     probability_healthy: float
+    disclaimer: str
+
+
+class ParkinsonsRiskFeaturesIn(BaseModel):
+    """
+    Inputs for the risk/worsening-trend classifier trained in
+    ml/training/train_risk_classifier.py. Unlike the disease classifier
+    above, these are CHANGE (delta) values relative to a patient's own
+    baseline telemonitoring visit, not raw acoustic measurements -- that
+    reframing is what made this model beat chance under proper patient-level
+    validation (see the training script's docstring for why). Field names
+    use the Telemonitoring dataset's own column names (no "MDVP:" prefix,
+    unlike the voice dataset above) prefixed with "delta_", as JSON aliases.
+    """
+    model_config = {"populate_by_name": True}
+
+    delta_jitter_pct: float = Field(..., alias="delta_Jitter(%)")
+    delta_jitter_abs: float = Field(..., alias="delta_Jitter(Abs)")
+    delta_jitter_rap: float = Field(..., alias="delta_Jitter:RAP")
+    delta_jitter_ppq5: float = Field(..., alias="delta_Jitter:PPQ5")
+    delta_jitter_ddp: float = Field(..., alias="delta_Jitter:DDP")
+    delta_shimmer: float = Field(..., alias="delta_Shimmer")
+    delta_shimmer_db: float = Field(..., alias="delta_Shimmer(dB)")
+    delta_shimmer_apq3: float = Field(..., alias="delta_Shimmer:APQ3")
+    delta_shimmer_apq5: float = Field(..., alias="delta_Shimmer:APQ5")
+    delta_shimmer_apq11: float = Field(..., alias="delta_Shimmer:APQ11")
+    delta_shimmer_dda: float = Field(..., alias="delta_Shimmer:DDA")
+    delta_nhr: float = Field(..., alias="delta_NHR")
+    delta_hnr: float = Field(..., alias="delta_HNR")
+    delta_rpde: float = Field(..., alias="delta_RPDE")
+    delta_dfa: float = Field(..., alias="delta_DFA")
+    delta_ppe: float = Field(..., alias="delta_PPE")
+    test_time: float = Field(..., description="Days since the patient's baseline telemonitoring visit")
+    baseline_total_UPDRS: float = Field(..., description="The patient's total_UPDRS score at their baseline visit")
+
+
+class ParkinsonsRiskPredictionOut(BaseModel):
+    predicted_class: int  # 0 = stable/improving, 1 = worsening (matches training label encoding)
+    predicted_label: str
+    probability_worsening: float
+    probability_stable_or_improving: float
     disclaimer: str

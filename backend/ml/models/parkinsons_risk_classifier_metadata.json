@@ -1,0 +1,63 @@
+{
+  "model": "LogisticRegression (scikit-learn Pipeline), selected by GroupKFold comparison across 2 candidate model families",
+  "candidates_compared": {
+    "LogisticRegression": {
+      "accuracy": 0.6304085502499569,
+      "precision": 0.5137650252035673,
+      "recall": 0.5981941309255079,
+      "f1": 0.5527743012098456,
+      "roc_auc": 0.6404992326567199
+    },
+    "RandomForest": {
+      "accuracy": 0.57921048095156,
+      "precision": 0.4604895104895105,
+      "recall": 0.5945823927765237,
+      "f1": 0.5190147783251231,
+      "roc_auc": 0.6230128704681739
+    }
+  },
+  "dataset": "UCI Parkinsons Telemonitoring (id=189), Tsanas & Little (2009), https://doi.org/10.24432/C5ZS3N",
+  "feature_columns_in_order": [
+    "delta_Jitter(%)",
+    "delta_Jitter(Abs)",
+    "delta_Jitter:RAP",
+    "delta_Jitter:PPQ5",
+    "delta_Jitter:DDP",
+    "delta_Shimmer",
+    "delta_Shimmer(dB)",
+    "delta_Shimmer:APQ3",
+    "delta_Shimmer:APQ5",
+    "delta_Shimmer:APQ11",
+    "delta_Shimmer:DDA",
+    "delta_NHR",
+    "delta_HNR",
+    "delta_RPDE",
+    "delta_DFA",
+    "delta_PPE",
+    "test_time",
+    "baseline_total_UPDRS"
+  ],
+  "target_column": "worsening (delta_total_UPDRS >= 3.0 from patient's own baseline visit)",
+  "target_meaning": {
+    "1": "total_UPDRS increased by >= 3.0 points since the patient's first recorded visit",
+    "0": "stable or improving relative to baseline"
+  },
+  "threshold_disclaimer": "3.0 points is an illustrative demonstration threshold chosen for this project, NOT a clinically validated minimal-detectable-change value. Do not present this as a clinically established cutoff.",
+  "why_this_framing": "Two prior attempts (absolute total_UPDRS regression, and exact delta-from-baseline regression) both failed patient-level GroupKFold validation with negative R^2 across 5 total model fits. This reframes the same features/target as a coarser binary 'trending worse or not' question, evaluated by ROC-AUC (rank-ordering only, not exact magnitude), as a lower and more achievable bar.",
+  "n_subjects": 42,
+  "n_recordings_after_dropping_baseline_visits": 5801,
+  "positive_class_rate": 0.38183071884157904,
+  "evaluation_strategy": "GroupKFold cross-validation (10 folds, grouped by patient subject#) across all 42 subjects. Zero patient leakage between train and test in any fold. All predictions pooled before computing metrics.",
+  "pooled_metrics": {
+    "accuracy": 0.6304085502499569,
+    "precision": 0.5137650252035673,
+    "recall": 0.5981941309255079,
+    "f1": 0.5527743012098456,
+    "roc_auc": 0.6404992326567199
+  },
+  "validation_threshold": {
+    "min_roc_auc": 0.6,
+    "chance_level": 0.5
+  },
+  "disclaimer": "Trained on a public research dataset for demonstration purposes only. Never trained or evaluated on real patient data. Not used anywhere in the live patient workflow/orchestrator pipeline."
+}
