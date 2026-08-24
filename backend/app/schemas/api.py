@@ -77,3 +77,21 @@ class AlertAcknowledgeIn(BaseModel):
 class KnowledgeSearchIn(BaseModel):
     query: str
     top_k: int = 5
+
+class ConditionIn(BaseModel):
+    disease_id: str
+    preferred_name: str
+    subtype: Optional[str] = None
+    stage: Optional[str] = None
+    diagnosed_at: Optional[str] = None  # ISO datetime string
+
+
+class AllergyIn(BaseModel):
+    substance: str
+
+
+class LongitudinalMetricIn(BaseModel):
+    metric: str
+    baseline_value: Optional[float] = None
+    current_value: Optional[float] = None
+    window: str = "unspecified"

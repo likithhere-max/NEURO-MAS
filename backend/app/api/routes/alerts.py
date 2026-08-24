@@ -3,10 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 
-from app.db import models as m
-from app.db.session import get_db
+from app.core.supabase_client import get_authed_client
 from app.schemas.api import AlertAcknowledgeIn
 from app.services.auth import get_current_user
 
@@ -14,37 +12,44 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
 @router.post("/{alert_id}/acknowledge")
-def acknowledge_alert(alert_id: str, payload: AlertAcknowledgeIn, db: Session = Depends(get_db), user: m.User = Depends(get_current_user)):
-    alert = db.get(m.Alert, alert_id)
-    if not alert:
+def acknowledge_alert(alert_id: str, payload: AlertAcknowledgeIn, user: dict = Depends(get_current_user)):
+    client = get_authed_client(user["_access_token"])
+    result = client.table("alerts").update({
+        "status": "acknowledged",
+        "acknowledged_by": user["sub"],
+        "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", alert_id).execute()
+    if not result.data:
         raise HTTPException(404, "alert not found")
-    alert.status = "acknowledged"
-    alert.acknowledged_by = user.id
-    alert.acknowledged_at = datetime.now(timezone.utc)
-    db.commit()
-    return {"id": alert.id, "status": alert.status}
+    alert = result.data[0]
+    return {"id": alert["id"], "status": alert["status"]}
 
 
 @router.get("")
-def list_alerts(status_filter: str | None = None, db: Session = Depends(get_db), user: m.User = Depends(get_current_user)):
-    q = db.query(m.Alert)
+def list_alerts(status_filter: str | None = None, user: dict = Depends(get_current_user)):
+    client = get_authed_client(user["_access_token"])
+    query = client.table("alerts").select("*")
     if status_filter:
-        q = q.filter(m.Alert.status == status_filter)
-    alerts = q.order_by(m.Alert.created_at.desc()).all()
+        query = query.eq("status", status_filter)
+    alerts = query.order("created_at", desc=True).execute().data
     return [{
-        "id": a.id, "patient_id": a.patient_id, "severity": a.severity, "reason": a.reason,
-        "status": a.status, "created_at": a.created_at.isoformat(),
+        "id": a["id"], "patient_id": a["patient_id"], "severity": a["severity"], "reason": a["reason"],
+        "status": a["status"], "created_at": a["created_at"],
     } for a in alerts]
 
 
 @router.post("/actions/{action_id}/approve")
-def approve_action(action_id: str, db: Session = Depends(get_db), user: m.User = Depends(get_current_user)):
-    if user.role != "clinician":
+def approve_action(action_id: str, user: dict = Depends(get_current_user)):
+    client = get_authed_client(user["_access_token"])
+    profile = client.table("profiles").select("role").eq("id", user["sub"]).execute()
+    caller_role = profile.data[0]["role"] if profile.data else "patient"
+    if caller_role != "clinician":
         raise HTTPException(403, "only a clinician may authorize a restricted action")
-    action = db.get(m.ActionRecord, action_id)
-    if not action:
+    result = client.table("actions").update({
+        "status": "executed",
+        "approved_by": user["sub"],
+    }).eq("id", action_id).execute()
+    if not result.data:
         raise HTTPException(404, "action not found")
-    action.status = "executed"
-    action.approved_by = user.id
-    db.commit()
-    return {"id": action.id, "status": action.status, "approved_by": action.approved_by}
+    action = result.data[0]
+    return {"id": action["id"], "status": action["status"], "approved_by": action["approved_by"]}
