@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     supabase_publishable_key: str = ""
     supabase_secret_key: str = ""
 
+    # --- Gemini ---
+    gemini_api_key: str = ""
+    gemini_default_model: str = "gemini-3.5-flash-lite"
+
     # --- Auth ---
     secret_key: str = "CHANGE_ME_INSECURE_DEV_ONLY_SECRET_KEY"
     access_token_expire_minutes: int = 60 * 8
@@ -40,6 +44,9 @@ class Settings(BaseSettings):
     # If no key is configured, the system falls back to a deterministic,
     # template-based reasoning provider and clearly labels output as such.
     # It NEVER silently fabricates a "smarter" answer.
+    # NOTE (2026-08-24): being superseded by the Gemini-specific
+    # ai/gemini_service.py built in Step 13 -- decide then whether to keep
+    # this abstraction or retire it. Not touched yet, left as-is.
     llm_provider: str = "template"  # "template" | "anthropic" | "openai"
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
