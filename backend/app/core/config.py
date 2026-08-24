@@ -28,10 +28,11 @@ class Settings(BaseSettings):
     gemini_default_model: str = "gemini-3.5-flash-lite"
     gemini_embedding_model: str = "gemini-embedding-2"
     gemini_embedding_dimensions: int = 768
-    # --- Auth ---
-    secret_key: str = "CHANGE_ME_INSECURE_DEV_ONLY_SECRET_KEY"
-    access_token_expire_minutes: int = 60 * 8
-    jwt_algorithm: str = "HS256"
+    # NOTE (Roadmap item 7 housekeeping): the old local-JWT "--- Auth ---"
+    # block (secret_key / jwt_algorithm / access_token_expire_minutes) was
+    # removed here -- verified unused anywhere in the codebase. Auth is
+    # handled entirely via Supabase JWT verification (JWKS/ES256) in
+    # app/services/auth.py now, which needs no local signing secret.
     # --- LLM / model providers (model-agnostic; see app/services/llm_provider.py) ---
     # If no key is configured, the system falls back to a deterministic,
     # template-based reasoning provider and clearly labels output as such.
