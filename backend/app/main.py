@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import agents, alerts, auth, knowledge, patients, workflows
 from app.core.config import get_settings
 from app.db.session import Base, engine
+from app.services.auth import get_current_user
 
 settings = get_settings()
 
@@ -49,3 +50,8 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get(f"{settings.api_v1_prefix}/whoami")
+def whoami(user: dict = Depends(get_current_user)):
+    return {"user_id": user["sub"], "email": user.get("email")}

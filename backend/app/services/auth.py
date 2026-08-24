@@ -1,71 +1,82 @@
 """
-Minimal JWT-based auth with role-based access control.
+Auth dependencies backed by real Supabase Auth tokens.
 
-Roles: clinician | patient | caregiver. Patient-data endpoints check role +
-ownership so a patient can only see their own record and a clinician can
-only see patients assigned to them -- a deliberately simple version of
-spec section 24's "patient data isolation" requirement, sufficient for a
-prototype but flagged in docs/ROADMAP.md as needing a real IAM story before
-any production use.
+Supabase signs access tokens asymmetrically (ES256) and publishes its
+public verification keys at a JWKS endpoint -- PyJWKClient fetches and
+caches those keys automatically, so we never store a shared secret here.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from functools import lru_cache
+from typing import Any
 
+import jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
 
 from app.core.config import get_settings
-from app.db.models import User
-from app.db.session import get_db
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+bearer_scheme = HTTPBearer()
 
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
-
-
-def create_access_token(subject: str, role: str) -> str:
+@lru_cache
+def get_jwks_client() -> PyJWKClient:
     settings = get_settings()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": subject, "role": role, "exp": expire}
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+    jwks_url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
+    return PyJWKClient(jwks_url)
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    settings = get_settings()
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> dict[str, Any]:
+    """
+    Verifies the incoming Supabase access token and returns its decoded
+    claims (a dict with at least 'sub' = the user's id and 'email').
+    Raises 401 if the token is missing, expired, or invalid.
+    """
+    token = credentials.credentials
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
-        user_id: Optional[str] = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
+        signing_key = get_jwks_client().get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["ES256"],
+            audience="authenticated",
+        )
+    except jwt.PyJWTError:
         raise credentials_exception
-
-    user = db.get(User, user_id)
-    if user is None:
-        raise credentials_exception
-    return user
+    return payload
 
 
 def require_role(*roles: str):
-    def _checker(user: User = Depends(get_current_user)) -> User:
-        if user.role not in roles:
-            raise HTTPException(status_code=403, detail=f"Role '{user.role}' not permitted; requires one of {roles}")
+    """
+    Use as a dependency on any route: Depends(require_role("clinician")).
+    Reads the role out of the caller's `profiles` row via a fresh lookup,
+    since the JWT itself doesn't carry your app-specific role claim.
+    """
+    from app.core.supabase_client import get_supabase_admin_client
+
+    def _checker(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+        admin = get_supabase_admin_client()
+        result = (
+            admin.table("profiles")
+            .select("role")
+            .eq("id", user["sub"])
+            .single()
+            .execute()
+        )
+        role = result.data["role"] if result.data else None
+        if role not in roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Role '{role}' not permitted; requires one of {roles}",
+            )
         return user
+
     return _checker
