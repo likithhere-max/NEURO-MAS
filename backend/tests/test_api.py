@@ -1,7 +1,16 @@
 """
-End-to-end API test: register a clinician, create a patient, trigger a
+End-to-end API test: sign up a clinician, create a patient, trigger a
 neurological-assessment workflow through the real HTTP layer, and check the
 response shape matches what the frontend dashboard depends on.
+
+NOTE: since the Supabase migration (Roadmap item 4), this hits the REAL
+Supabase project and the REAL (free-tier) Gemini API -- there is no isolated
+test database anymore. Every run creates real rows (a clinician profile, a
+patient, a workflow) in your live Supabase project and spends real Gemini
+API calls. `_register_and_login` doesn't check the signup response's status,
+so reruns with the same hardcoded test email are fine -- signup fails
+silently (already registered) and the login assertion right after it is
+what actually matters.
 """
 from fastapi.testclient import TestClient
 
@@ -11,10 +20,10 @@ client = TestClient(app)
 
 
 def _register_and_login(role="clinician", email="doc@example.com"):
-    client.post("/api/v1/auth/register", json={
+    client.post("/api/v1/auth/signup", json={
         "email": email, "password": "testpass123", "full_name": "Dr Test", "role": role,
     })
-    resp = client.post("/api/v1/auth/login", data={"username": email, "password": "testpass123"})
+    resp = client.post("/api/v1/auth/login", json={"email": email, "password": "testpass123"})
     assert resp.status_code == 200, resp.text
     return resp.json()["access_token"]
 
@@ -26,7 +35,6 @@ def test_health():
 def test_register_login_and_create_patient_and_run_workflow():
     token = _register_and_login()
     headers = {"Authorization": f"Bearer {token}"}
-
     patient_resp = client.post("/api/v1/patients", json={
         "full_name": "Test Patient", "age": 45, "sex": "female",
         "conditions": ["Epilepsy (focal and generalized)"],
