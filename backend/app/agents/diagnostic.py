@@ -1,17 +1,19 @@
 """
 Neuro-Diagnostic Agent (spec 6.3).
 
-Performs symptom-pattern matching against the curated neurological disease
-knowledge base. This is explicitly a lexical-overlap heuristic, NOT a
-trained diagnostic classifier -- confidence is derived from term overlap and
-capped conservatively so the system never "claims certainty from
-insufficient information," per the spec's own constraint on this agent.
+Performs symptom-based condition matching against the curated neurological
+knowledge base, via real semantic search (Gemini embeddings + Supabase
+pgvector -- see app/rag/knowledge_retriever.py), automatically falling back
+to literal keyword overlap if the embedding/database pipeline is ever
+unavailable. Either way, this stays a heuristic retrieval signal, NOT a
+trained diagnostic classifier -- confidence is capped conservatively so the
+system never "claims certainty from insufficient information."
 
-Gemini's role here is deliberately narrow, same principle as the risk agent:
-it only turns the already-computed candidate list into a plain-language
-explanation. It never adds a candidate, never changes a confidence score,
-and never states a definitive diagnosis -- `requires_human_review` stays
-hardcoded True regardless of what Gemini says.
+Gemini's role in narrative generation is deliberately narrow, same principle
+as the risk agent: it only turns the already-computed candidate list into a
+plain-language explanation. It never adds a candidate, never changes a
+confidence score, and never states a definitive diagnosis --
+`requires_human_review` stays hardcoded True regardless of what Gemini says.
 """
 from __future__ import annotations
 
@@ -23,13 +25,13 @@ from pydantic import BaseModel
 from app.agents.base import BaseNeuroAgent
 from app.ai.gemini_service import GeminiServiceError, generate_structured
 from app.core.messaging import EvidenceItem
+from app.rag import knowledge_retriever
 from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
-from app.services.knowledge_base import get_knowledge_base
 
 logger = logging.getLogger("neuromas.agents.diagnostic")
 
-MAX_HEURISTIC_CONFIDENCE = 0.75  # never let a keyword-overlap score claim near-certainty
+MAX_HEURISTIC_CONFIDENCE = 0.75  # never let a retrieval-based score claim near-certainty
 
 
 class _DiagnosisNarrative(BaseModel):
@@ -55,9 +57,9 @@ async def _explain_diagnosis_with_gemini(candidates: list[dict], red_flags: list
     red_flag_line = f"Red flags noted: {', '.join(red_flags)}." if red_flags else "No red flags noted."
 
     prompt = (
-        f"A lexical symptom-matching heuristic (not you) produced these candidate neurological "
+        f"A symptom-retrieval heuristic (not you) produced these candidate neurological "
         f"conditions, ranked by confidence (capped at {MAX_HEURISTIC_CONFIDENCE} since this is "
-        f"keyword overlap, not a validated diagnostic model):\n{candidate_lines}\n\n{red_flag_line}\n\n"
+        f"a retrieval heuristic, not a validated diagnostic model):\n{candidate_lines}\n\n{red_flag_line}\n\n"
         "Write a 2-4 sentence plain-language explanation for a clinician of what this candidate "
         "list suggests and why, based only on the information above. Do not add new candidate "
         "conditions, do not change or invent confidence numbers, and do not state a definitive "
@@ -69,8 +71,8 @@ async def _explain_diagnosis_with_gemini(candidates: list[dict], red_flags: list
             prompt,
             _DiagnosisNarrative,
             system_instruction=(
-                "You explain already-computed differential-diagnosis candidates from a lexical "
-                "matching heuristic in plain language for a clinician. You never add new "
+                "You explain already-computed differential-diagnosis candidates from a symptom "
+                "retrieval heuristic in plain language for a clinician. You never add new "
                 "candidates, never change confidence scores, and never assert a definitive "
                 "diagnosis. This is a demo system, not medical advice, and all output requires "
                 "clinician review."
@@ -85,10 +87,9 @@ async def _explain_diagnosis_with_gemini(candidates: list[dict], red_flags: list
 class NeuroDiagnosticAgent(BaseNeuroAgent):
     name = "neuro_diagnostic_agent"
     capabilities = ["differential_diagnosis", "syndrome_matching"]
-    reliability_weight = 0.65  # heuristic lexical matcher -> moderate trust
+    reliability_weight = 0.65  # heuristic retrieval matcher -> moderate trust
 
     async def execute(self, task: AgentTask, state: PatientState) -> AgentResult:
-        kb = get_knowledge_base()
         observations = (task.input_payload or {}).get("observations", [])
         symptom_terms = [
             o.get("name") or o.get("free_text", "")
@@ -110,34 +111,31 @@ class NeuroDiagnosticAgent(BaseNeuroAgent):
                 raw_payload={"candidate_conditions": [], "missing_information": ["symptoms"]},
             )
 
-        matches = kb.match_symptoms(symptom_terms, top_k=5)
-        candidates = []
+        candidates = await knowledge_retriever.match_symptoms(symptom_terms, known_conditions, top_k=5)
+
         evidence: list[EvidenceItem] = []
-        contradicting: list[str] = []
         red_flags: list[str] = []
-        for m in matches:
-            confidence = min(m["_match_score"], 1.0) * MAX_HEURISTIC_CONFIDENCE
-            # Boost slightly if this condition is already part of the patient's
-            # known history -- prior diagnosis is real evidence, not noise.
-            if m["preferred_name"] in known_conditions or m["disease_id"] in known_conditions:
-                confidence = min(confidence + 0.15, MAX_HEURISTIC_CONFIDENCE)
-            candidates.append({
-                "disease_id": m["disease_id"],
-                "preferred_name": m["preferred_name"],
-                "confidence": round(confidence, 2),
-                "matched_terms": m["_matched_terms"],
-                "icd10_codes": m.get("icd10_codes", []),
-            })
+        for c in candidates:
+            if c["retrieval_method"] == "semantic_embedding":
+                description = (
+                    f"Semantic similarity {c['retrieval_score']} with {c['preferred_name']} "
+                    f"(embedding-based retrieval)"
+                )
+            else:
+                description = (
+                    f"Symptom overlap with {c['preferred_name']}: {', '.join(c['matched_terms']) or 'none'} "
+                    f"(lexical fallback -- semantic search unavailable)"
+                )
             evidence.append(EvidenceItem(
                 source_type="knowledge_base",
-                description=f"Symptom overlap with {m['preferred_name']}: {', '.join(m['_matched_terms'])}",
-                reference=(m.get("source_urls") or [None])[0],
-                strength=round(m["_match_score"], 2),
+                description=description,
+                reference=(c["source_urls"] or [None])[0],
+                strength=round(min(max(c["retrieval_score"], 0.0), 1.0), 2),
             ))
-            red_flags.extend(m.get("red_flags", []) or [])
+            red_flags.extend(c["red_flags"])
 
-        candidates.sort(key=lambda c: c["confidence"], reverse=True)
         top_confidence = candidates[0]["confidence"] if candidates else 0.0
+        used_fallback = any(c["retrieval_method"] == "lexical_fallback" for c in candidates)
 
         missing_info = []
         if not observations or len(observations) < 2:
@@ -154,12 +152,14 @@ class NeuroDiagnosticAgent(BaseNeuroAgent):
         ]
 
         template_summary = (
-            f"Matched {len(candidates)} candidate condition(s) via symptom-term overlap "
+            f"Matched {len(candidates)} candidate condition(s) via symptom retrieval "
             f"against the curated knowledge base. Top candidate confidence capped at "
-            f"{MAX_HEURISTIC_CONFIDENCE} to reflect that this is a lexical heuristic, not a "
+            f"{MAX_HEURISTIC_CONFIDENCE} to reflect that this is a retrieval heuristic, not a "
             f"validated diagnostic model."
         )
-        warnings = ["heuristic_lexical_matching_only_not_a_clinical_diagnosis"]
+        warnings = ["heuristic_retrieval_only_not_a_clinical_diagnosis"]
+        if used_fallback:
+            warnings.append("semantic_search_unavailable_used_lexical_fallback")
 
         reasoning_summary = template_summary
         narrative_source = "template_fallback"
@@ -184,9 +184,9 @@ class NeuroDiagnosticAgent(BaseNeuroAgent):
             reasoning_summary=reasoning_summary,
             raw_payload={
                 "candidate_conditions": candidates,
-                "contradicting_evidence": contradicting,
                 "missing_information": missing_info,
                 "red_flags": sorted(set(red_flags)),
                 "narrative_source": narrative_source,
+                "retrieval_method": candidates[0]["retrieval_method"] if candidates else "n/a",
             },
         )
