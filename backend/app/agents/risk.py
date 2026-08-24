@@ -7,12 +7,25 @@ NEVER `validated_clinical_risk_score` -- because none of these formulas have
 undergone clinical validation. That distinction is enforced in the output
 schema itself, not just in prose, so downstream consumers (UI, orchestrator)
 can't accidentally present a heuristic as validated.
+
+Gemini's role here is deliberately narrow: it only turns the already-computed
+deterministic scores into a plain-language explanation. It never computes,
+adjusts, or invents a risk number -- that stays 100% heuristic/auditable, per
+the architecture decision that safety-relevant scoring must stay deterministic.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
+
+from pydantic import BaseModel
+
 from app.agents.base import BaseNeuroAgent
+from app.ai.gemini_service import GeminiServiceError, generate_structured
 from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
+
+logger = logging.getLogger("neuromas.agents.risk")
 
 
 def _bucket(score: float) -> str:
@@ -23,6 +36,47 @@ def _bucket(score: float) -> str:
     if score >= 0.25:
         return "medium"
     return "low"
+
+
+class _RiskNarrative(BaseModel):
+    """Gemini's structured output -- ONLY a narrative explanation of numbers
+    we already computed. This schema has no numeric fields on purpose, so
+    Gemini has no field to sneak a fabricated score into."""
+    explanation: str
+
+
+async def _explain_risk_with_gemini(factors: dict[str, float], overall_bucket: str) -> str | None:
+    """
+    Best-effort: turns the already-computed, deterministic heuristic scores
+    into a clinician-readable explanation. Returns None on any failure so the
+    caller falls back to the plain template sentence -- this must never
+    crash the agent or cause it to invent risk numbers.
+    """
+    factor_lines = "\n".join(
+        f"- {name.replace('_', ' ')}: {score} ({_bucket(score)})" for name, score in factors.items()
+    )
+    prompt = (
+        f"These neurological risk scores were computed by a deterministic heuristic, "
+        f"not by you. Overall bucket: {overall_bucket}.\n{factor_lines}\n\n"
+        "Write a 2-3 sentence plain-language explanation of what these scores mean "
+        "for a clinician reviewing this patient. Do not invent new numbers, symptoms, "
+        "or diagnoses -- only explain the scores given above."
+    )
+    try:
+        result = await asyncio.to_thread(
+            generate_structured,
+            prompt,
+            _RiskNarrative,
+            system_instruction=(
+                "You explain already-computed clinical risk heuristics in plain "
+                "language. You never compute, alter, or invent risk scores yourself. "
+                "This is a demo system, not medical advice."
+            ),
+        )
+        return result.explanation
+    except GeminiServiceError as exc:
+        logger.warning("gemini_risk_narrative_failed error=%s", repr(exc))
+        return None
 
 
 class RiskStratificationAgent(BaseNeuroAgent):
@@ -90,6 +144,18 @@ class RiskStratificationAgent(BaseNeuroAgent):
 
         overall = max(factors.values()) if factors else 0.0
         confidence = 0.65 if any(factors.values()) else 0.3
+        bucket = _bucket(overall)
+
+        warnings = ["heuristic_score_not_a_validated_clinical_risk_score"]
+        narrative = await _explain_risk_with_gemini(factors, bucket)
+        if narrative:
+            reasoning_summary = narrative
+        else:
+            warnings.append("gemini_narrative_unavailable_used_template_summary")
+            reasoning_summary = (
+                f"Computed heuristic risk scores from available signal/longitudinal/diagnostic "
+                f"inputs. Overall bucket: {bucket}."
+            )
 
         return AgentResult(
             agent_name=self.name,
@@ -97,16 +163,14 @@ class RiskStratificationAgent(BaseNeuroAgent):
             status=AgentStatus.COMPLETED,
             findings=findings,
             confidence=confidence,
-            warnings=["heuristic_score_not_a_validated_clinical_risk_score"],
+            warnings=warnings,
             recommended_next_agents=["personalization_agent"],
             requires_human_review=overall >= 0.5,
-            reasoning_summary=(
-                f"Computed heuristic risk scores from available signal/longitudinal/diagnostic "
-                f"inputs. Overall bucket: {_bucket(overall)}."
-            ),
+            reasoning_summary=reasoning_summary,
             raw_payload={
                 "heuristic_scores": factors,
-                "overall_bucket": _bucket(overall),
+                "overall_bucket": bucket,
                 "score_type": "heuristic_score",  # explicitly not "validated_clinical_risk_score"
+                "narrative_source": "gemini" if narrative else "template_fallback",
             },
         )
