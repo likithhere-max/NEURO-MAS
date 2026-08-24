@@ -1,6 +1,5 @@
 """
 Patient Copilot Agent (spec 6.10).
-
 Patient-facing explainer. It never generates new clinical findings -- it
 only translates an already-computed, already-safety-checked orchestrator
 result into plain language via the pluggable LLMProvider (default:
@@ -32,13 +31,17 @@ class PatientCopilotAgent(BaseNeuroAgent):
         summary = await provider.summarize(payload.get("structured_context", {}))
         full_text = f"{summary}\n\n{DISCLAIMER}"
 
+        warnings = [f"narrative_provider:{provider.label}"]
+        if getattr(provider, "last_call_used_fallback", False):
+            warnings.append("gemini_narrative_unavailable_used_template_summary")
+
         return AgentResult(
             agent_name=self.name,
             task_id=task.task_id,
             status=AgentStatus.COMPLETED,
             findings=[AgentFinding(label="explanation_generated", detail="plain-language summary produced", severity="info")],
             confidence=1.0,  # confidence here reflects "generation succeeded", not clinical certainty
-            warnings=[f"narrative_provider:{provider.label}"],
+            warnings=warnings,
             recommended_next_agents=[],
             requires_human_review=False,
             reasoning_summary="Translated the orchestrator's structured decision into plain language; introduced no new clinical claims.",
