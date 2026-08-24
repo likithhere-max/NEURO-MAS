@@ -51,6 +51,7 @@ def get_current_user(
         )
     except jwt.PyJWTError:
         raise credentials_exception
+    payload["_access_token"] = token
     return payload
 
 
