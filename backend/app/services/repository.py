@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from supabase import Client
 
+from app.ml.personalized_anomaly import detect_personal_anomaly
 from app.orchestrator.orchestrator import WorkflowState
 from app.schemas.patient_state import (
     AdherenceState,
@@ -37,6 +38,14 @@ def build_patient_state(client: Client, patient: dict) -> PatientState:
     medications_rows = client.table("medications").select("*").eq("patient_id", patient_id).execute().data
     allergies_rows = client.table("allergies").select("*").eq("patient_id", patient_id).execute().data
     metrics_rows = client.table("longitudinal_metrics").select("*").eq("patient_id", patient_id).execute().data
+    readings_rows = (
+        client.table("metric_readings")
+        .select("*")
+        .eq("patient_id", patient_id)
+        .order("recorded_at")
+        .execute()
+        .data
+    )
 
     conditions = [c["preferred_name"] for c in conditions_rows]
 
@@ -46,6 +55,27 @@ def build_patient_state(client: Client, patient: dict) -> PatientState:
     ]
     adherence_values = [med["adherence_pct_30d"] for med in medications_rows if med["adherence_pct_30d"] is not None]
     adherence_avg = round(sum(adherence_values) / len(adherence_values), 3) if adherence_values else None
+
+    # Group individual readings by metric (already ordered oldest-first by the
+    # query above), so personalized within-patient anomaly detection (Roadmap
+    # item 6, Track 1) can compare the latest reading against THIS patient's
+    # own prior readings for that metric.
+    readings_by_metric: dict[str, list[float]] = {}
+    for r in readings_rows:
+        readings_by_metric.setdefault(r["metric"], []).append(r["value"])
+
+    def _anomaly_fields(metric_name: str) -> dict:
+        values = readings_by_metric.get(metric_name, [])
+        if not values:
+            return {}
+        history, latest = values[:-1], values[-1]
+        result = detect_personal_anomaly(history, latest)
+        return {
+            "anomaly_method": result["method"],
+            "anomaly_z_score": result["z_score"],
+            "is_personal_anomaly": result["is_anomaly"],
+            "readings_available": result["readings_available"],
+        }
 
     trends = [
         LongitudinalTrend(
@@ -59,9 +89,19 @@ def build_patient_state(client: Client, patient: dict) -> PatientState:
                 else "improving" if met["current_value"] < met["baseline_value"] * 0.95
                 else "stable"
             ),
+            **_anomaly_fields(met["metric"]),
         )
         for met in metrics_rows
     ]
+
+    # Metrics that have raw readings but no longitudinal_metrics row at all
+    # yet still surface their own-history anomaly signal (baseline/current
+    # stay at their defaults -- there's genuinely nothing there).
+    covered_metrics = {met["metric"] for met in metrics_rows}
+    for metric_name in readings_by_metric:
+        if metric_name in covered_metrics:
+            continue
+        trends.append(LongitudinalTrend(metric=metric_name, **_anomaly_fields(metric_name)))
 
     wearable_baselines = {}
     for met in metrics_rows:

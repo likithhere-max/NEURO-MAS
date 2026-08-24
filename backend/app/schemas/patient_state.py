@@ -1,16 +1,3 @@
-"""
-Formal, persisted patient-state model.
-
-This is the shared "blackboard" every agent reads from and writes findings
-about. It intentionally treats every field as optional/partial: the whole
-point of section 4 of the spec is that the system must degrade gracefully
-when data is missing, not assume a fully populated record.
-
-The personalization state vector P_t = [D_t, S_t, M_t, R_t, B_t, C_t, A_t, E_t]
-(section 36) is represented directly as named sub-objects on PatientState
-rather than a bare vector, so every dimension is inspectable and auditable
-instead of being an opaque array of floats.
-"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -82,6 +69,15 @@ class LongitudinalTrend(BaseModel):
     trend: str = "unknown"  # "improving" | "stable" | "deteriorating" | "unknown"
     delta: Optional[float] = None
     window: str = "unspecified"
+    # Personalized within-patient anomaly detection (Roadmap item 6, Track 1):
+    # real statistics (mean/stdev) over THIS patient's own historical
+    # metric_readings -- never a population model. Computed in
+    # repository.build_patient_state() via app/ml/personalized_anomaly.py.
+    # Defaults reflect "not enough history yet", not "no anomaly found".
+    anomaly_method: Optional[str] = None  # "z_score" | "zero_variance" | "insufficient_history" | None
+    anomaly_z_score: Optional[float] = None
+    is_personal_anomaly: bool = False
+    readings_available: int = 0
 
 
 class PatientPreferences(BaseModel):
@@ -114,7 +110,6 @@ class PatientState(BaseModel):
     comorbidities: list[str] = Field(default_factory=list)
     seizure_history: list[dict[str, Any]] = Field(default_factory=list)
     previous_neurological_events: list[dict[str, Any]] = Field(default_factory=list)
-
     longitudinal_trends: list[LongitudinalTrend] = Field(default_factory=list)
     wearable_metrics: dict[str, Any] = Field(default_factory=dict)
 

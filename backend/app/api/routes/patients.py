@@ -8,6 +8,7 @@ from app.schemas.api import (
     ConditionIn,
     LongitudinalMetricIn,
     MedicationIn,
+    MetricReadingIn,
     ObservationBatchIn,
     PatientCreate,
     PatientOut,
@@ -100,6 +101,21 @@ def add_longitudinal_metric(patient_id: str, payload: LongitudinalMetricIn, user
     result = client.table("longitudinal_metrics").insert(row).execute()
     if not result.data:
         raise HTTPException(500, "Failed to add longitudinal metric")
+    return result.data[0]
+
+
+@router.post("/{patient_id}/metric-readings")
+def add_metric_reading(patient_id: str, payload: MetricReadingIn, user: dict = Depends(get_current_user)):
+    client = get_authed_client(user["_access_token"])
+    patient_result = client.table("patients").select("id").eq("id", patient_id).execute()
+    if not patient_result.data:
+        raise HTTPException(404, "patient not found")
+    row = {"patient_id": patient_id, "metric": payload.metric, "value": payload.value}
+    if payload.recorded_at:
+        row["recorded_at"] = payload.recorded_at
+    result = client.table("metric_readings").insert(row).execute()
+    if not result.data:
+        raise HTTPException(500, "Failed to add metric reading")
     return result.data[0]
 
 
