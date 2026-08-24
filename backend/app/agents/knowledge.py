@@ -1,19 +1,75 @@
 """
 Knowledge / Literature (RAG) Agent (spec 6.9).
-
 Retrieves source-backed evidence from the curated neurological disease
 knowledge base for the candidate conditions the diagnostic agent surfaced.
 Every returned item carries its source URL and last_verified date; the agent
 never invents a citation -- if nothing in the knowledge base matches, it
 says so explicitly instead of fabricating a reference.
+
+Gemini is used here the same way as in risk.py and diagnostic.py: it only
+writes the plain-language reasoning_summary describing what evidence was
+found. It never adds, removes, or alters a citation/source URL, and it is
+never called when there is nothing to explain (no citations found).
 """
 from __future__ import annotations
 
+import asyncio
+
+from pydantic import BaseModel
+
 from app.agents.base import BaseNeuroAgent
+from app.ai.gemini_service import GeminiServiceError, generate_structured
 from app.core.messaging import EvidenceItem
 from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
 from app.services.knowledge_base import get_knowledge_base
+
+
+class _EvidenceNarrative(BaseModel):
+    explanation: str
+
+
+async def _explain_evidence_with_gemini(evidence_summaries: list[dict]) -> str | None:
+    """
+    Asks Gemini to write a short plain-language summary of the evidence that
+    was retrieved -- and nothing else. The prompt gives Gemini only the
+    already-verified facts (condition name, source count, last verified
+    date, a short definition excerpt) and explicitly forbids inventing
+    anything beyond them. Returns None on any failure so the caller falls
+    back to the template sentence.
+    """
+    if not evidence_summaries:
+        return None
+
+    lines = [
+        f"- {item['condition']}: {item['source_count']} cited source(s), "
+        f"last verified {item['last_verified']}. Definition: {item['definition']}"
+        for item in evidence_summaries
+    ]
+    prompt = (
+        "Here is the source-backed evidence retrieved for a set of candidate "
+        "neurological conditions:\n\n" + "\n".join(lines) + "\n\n"
+        "Write a short (2-4 sentence) plain-language summary of what evidence "
+        "was found, for a clinician reviewing this case."
+    )
+    system_instruction = (
+        "You summarize already-retrieved medical evidence for a clinical "
+        "documentation assistant. Only describe what is explicitly listed "
+        "above -- never invent a source, a statistic, a condition, or a "
+        "clinical claim that isn't given to you. Do not make or imply a "
+        "diagnosis. Output only the summary text."
+    )
+
+    try:
+        result = await asyncio.to_thread(
+            generate_structured,
+            prompt,
+            _EvidenceNarrative,
+            system_instruction=system_instruction,
+        )
+        return result.explanation
+    except GeminiServiceError:
+        return None
 
 
 class KnowledgeAgent(BaseNeuroAgent):
@@ -31,11 +87,13 @@ class KnowledgeAgent(BaseNeuroAgent):
         evidence: list[EvidenceItem] = []
         findings = []
         citations = []
+        evidence_summaries = []
 
         for c in candidates[:3]:
             record = kb.get(c["disease_id"])
             if not record:
                 continue
+            source_count = len(record.get("source_urls", []))
             for url in record.get("source_urls", []):
                 citations.append({
                     "disease": record["preferred_name"],
@@ -51,9 +109,15 @@ class KnowledgeAgent(BaseNeuroAgent):
                 ))
             findings.append(AgentFinding(
                 label=f"evidence:{record['preferred_name']}",
-                detail=f"{len(record.get('source_urls', []))} source(s) cited, last verified {record.get('last_verified')}",
+                detail=f"{source_count} source(s) cited, last verified {record.get('last_verified')}",
                 severity="info",
             ))
+            evidence_summaries.append({
+                "condition": record["preferred_name"],
+                "definition": record.get("definition", ""),
+                "source_count": source_count,
+                "last_verified": record.get("last_verified"),
+            })
 
         if not citations:
             return AgentResult(
@@ -64,8 +128,21 @@ class KnowledgeAgent(BaseNeuroAgent):
                 warnings=["no_matching_knowledge_base_entry_no_citation_fabricated"],
                 reasoning_summary="No candidate condition matched an entry in the curated knowledge base; "
                                    "no citation was fabricated to fill the gap.",
-                raw_payload={"citations": []},
+                raw_payload={"citations": [], "narrative_source": "not_applicable_no_citations"},
             )
+
+        narrative = await _explain_evidence_with_gemini(evidence_summaries)
+        warnings = ["knowledge_base_is_a_curated_prototype_subset_not_a_full_literature_index"]
+        if narrative:
+            reasoning_summary = narrative
+            narrative_source = "gemini"
+        else:
+            reasoning_summary = (
+                f"Retrieved {len(citations)} source-backed citation(s) for "
+                f"{len(candidates[:3])} candidate condition(s)."
+            )
+            narrative_source = "template_fallback"
+            warnings.append("gemini_narrative_unavailable_used_template_summary")
 
         return AgentResult(
             agent_name=self.name,
@@ -74,9 +151,9 @@ class KnowledgeAgent(BaseNeuroAgent):
             findings=findings,
             confidence=0.75,
             evidence=evidence,
-            warnings=["knowledge_base_is_a_curated_prototype_subset_not_a_full_literature_index"],
+            warnings=warnings,
             recommended_next_agents=[],
             requires_human_review=False,
-            reasoning_summary=f"Retrieved {len(citations)} source-backed citation(s) for {len(candidates[:3])} candidate condition(s).",
-            raw_payload={"citations": citations},
+            reasoning_summary=reasoning_summary,
+            raw_payload={"citations": citations, "narrative_source": narrative_source},
         )
