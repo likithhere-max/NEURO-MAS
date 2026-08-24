@@ -2,9 +2,10 @@
 Single access point for all Gemini API calls in NEURO-MAS.
 
 No other module should import google.genai directly -- always go through
-generate_structured() here. This keeps model selection, retries, timeouts,
-and logging (latency + token counts, NEVER raw prompt content, since prompts
-may contain real patient symptom data) in exactly one place.
+generate_structured() or embed_text() here. This keeps model selection,
+retries, timeouts, and logging (latency + token counts, NEVER raw prompt
+content, since prompts may contain real patient symptom data) in exactly
+one place.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ import time
 from typing import TypeVar
 
 from google import genai
+from google.genai import types
 from pydantic import BaseModel
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -36,9 +38,9 @@ def _get_client() -> genai.Client:
 
 
 class GeminiServiceError(Exception):
-    """Raised when Gemini fails after all retries. Callers (agents) must
-    decide their own fallback behavior -- this function never silently
-    returns fabricated data when the real call fails."""
+    """Raised when Gemini fails after all retries. Callers must decide their
+    own fallback behavior -- this module never silently returns fabricated
+    data when the real call fails."""
 
 
 @retry(
@@ -100,3 +102,55 @@ def generate_structured(
     if response.parsed is None:
         raise GeminiServiceError("Gemini returned output that didn't match the expected schema")
     return response.parsed
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception_type(Exception),
+    reraise=True,
+)
+def _call_embed(model: str, content: str, dimensions: int):
+    client = _get_client()
+    return client.models.embed_content(
+        model=model,
+        contents=content,
+        config=types.EmbedContentConfig(output_dimensionality=dimensions),
+    )
+
+
+def embed_text(text: str, *, task_hint: str | None = None) -> list[float]:
+    """
+    Turns text into a vector embedding for semantic search (RAG). Retries
+    transient failures the same way generate_structured does. Raises
+    GeminiServiceError on persistent failure -- callers must handle this
+    (e.g. skip semantic retrieval and fall back to the lexical matcher)
+    rather than crash.
+
+    task_hint mirrors Gemini's recommended prompt-prefix convention for its
+    embedding model: use "search document" when embedding knowledge base
+    entries at ingestion time, "search query" when embedding a patient's
+    symptom text at lookup time. Using consistent hints on both sides
+    matters for retrieval quality.
+    """
+    settings = get_settings()
+    content = f"task: {task_hint} | query: {text}" if task_hint else text
+
+    started = time.monotonic()
+    try:
+        result = _call_embed(settings.gemini_embedding_model, content, settings.gemini_embedding_dimensions)
+    except Exception as exc:
+        elapsed_ms = round((time.monotonic() - started) * 1000)
+        logger.error(
+            "gemini_embed_failed model=%s elapsed_ms=%d error=%s",
+            settings.gemini_embedding_model, elapsed_ms, repr(exc),
+        )
+        raise GeminiServiceError(f"Gemini embedding call failed after retries: {exc}") from exc
+
+    elapsed_ms = round((time.monotonic() - started) * 1000)
+    vector = result.embeddings[0].values
+    logger.info(
+        "gemini_embed_ok model=%s elapsed_ms=%d dimensions=%d",
+        settings.gemini_embedding_model, elapsed_ms, len(vector),
+    )
+    return vector

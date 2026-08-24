@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # --- Gemini ---
     gemini_api_key: str = ""
     gemini_default_model: str = "gemini-3.5-flash-lite"
+    gemini_embedding_model: str = "gemini-embedding-2"
+    gemini_embedding_dimensions: int = 768
 
     # --- Auth ---
     secret_key: str = "CHANGE_ME_INSECURE_DEV_ONLY_SECRET_KEY"
