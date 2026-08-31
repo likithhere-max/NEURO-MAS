@@ -12,7 +12,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newAge, setNewAge] = useState("60");
-  const [newCondition, setNewCondition] = useState("Epilepsy (focal and generalized)");
+  const [newConditionId, setNewConditionId] = useState("");
   const [diseases, setDiseases] = useState<any[]>([]);
 
   async function refresh() {
@@ -42,8 +42,24 @@ export default function HomePage() {
 
   async function createPatient(e: React.FormEvent) {
     e.preventDefault();
-    await api.createPatient({ full_name: newName, age: Number(newAge), conditions: [newCondition] });
+    const created = await api.createPatient({ full_name: newName, age: Number(newAge) });
+    // create_patient() deliberately never persists a condition string itself
+    // (ambiguous: disease_id vs. preferred_name -- see the backend's own
+    // comment). If the clinician picked a known pre-existing condition here,
+    // record it through the unambiguous /conditions endpoint instead, so
+    // this dropdown actually does something rather than being silently
+    // discarded (that used to happen -- fixed in the 2-day review sprint).
+    if (newConditionId) {
+      const disease = diseases.find((d) => d.disease_id === newConditionId);
+      if (disease) {
+        await api.addCondition(created.id, {
+          disease_id: disease.disease_id,
+          preferred_name: disease.preferred_name,
+        });
+      }
+    }
     setNewName("");
+    setNewConditionId("");
     refresh();
   }
 
@@ -93,16 +109,26 @@ export default function HomePage() {
               placeholder="Full name" value={newName} onChange={(e) => setNewName(e.target.value)} />
             <input className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
               placeholder="Age" type="number" value={newAge} onChange={(e) => setNewAge(e.target.value)} />
-            <select className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
-              value={newCondition} onChange={(e) => setNewCondition(e.target.value)}>
-              {diseases.map((d: any) => (
-                <option key={d.disease_id} value={d.preferred_name}>{d.preferred_name}</option>
-              ))}
-            </select>
+            <div>
+              <label className="text-xs text-neuro-muted block mb-1">
+                Known pre-existing condition (optional — clinician-documented history, not a diagnosis)
+              </label>
+              <select className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
+                value={newConditionId} onChange={(e) => setNewConditionId(e.target.value)}>
+                <option value="">None recorded yet</option>
+                {diseases.map((d: any) => (
+                  <option key={d.disease_id} value={d.disease_id}>{d.preferred_name}</option>
+                ))}
+              </select>
+            </div>
             <button className="w-full bg-neuro-accent text-neuro-bg font-medium rounded-lg py-2 text-sm">
               Create patient
             </button>
           </form>
+          <div className="text-[11px] text-neuro-muted mt-3">
+            To assess new symptoms, create the patient here, then use Symptom Assessment on their dashboard —
+            diagnosis is never made by picking from this list.
+          </div>
         </div>
         <div className="text-[11px] text-neuro-muted mt-3">Signed in as role: {role}</div>
       </div>

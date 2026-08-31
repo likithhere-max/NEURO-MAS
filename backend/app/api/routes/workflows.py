@@ -5,8 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.core.supabase_client import get_authed_client
 from app.orchestrator.orchestrator import run_workflow
 from app.schemas.api import WorkflowTriggerIn
+from app.schemas.symptom_assessment import SymptomAssessmentIn
 from app.services.auth import get_current_user
 from app.services.repository import build_patient_state, persist_workflow
+from app.services.symptom_extraction import (
+    SymptomExtractionError,
+    extract_symptom_profile,
+    extracted_profile_to_symptom_ins,
+)
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -67,6 +73,100 @@ async def trigger_neurological_assessment(
         client.table("observations").insert(observation_rows).execute()
 
     return _serialize_workflow(workflow_state)
+
+
+@router.post("/symptom-assessment/{patient_id}")
+async def trigger_symptom_assessment(
+    patient_id: str,
+    payload: SymptomAssessmentIn,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Real natural-language symptom entry point (2-day review sprint feature).
+
+    Extracts structured clinical features from the patient's own free-text
+    description, converts them into the same SymptomIn contract the manual
+    /workflows/neurological-assessment/{id} endpoint already uses, and runs
+    the UNMODIFIED existing multi-agent pipeline (run_workflow) over them.
+    This endpoint adds a real input layer -- it does not add a second
+    diagnostic pipeline.
+    """
+    client = get_authed_client(user["_access_token"])
+
+    patient_result = client.table("patients").select("*").eq("id", patient_id).execute()
+    if not patient_result.data:
+        raise HTTPException(404, "patient not found")
+    patient = patient_result.data[0]
+
+    if not payload.free_text or not payload.free_text.strip():
+        raise HTTPException(422, "free_text is required")
+
+    try:
+        extracted = await extract_symptom_profile(payload)
+    except SymptomExtractionError as exc:
+        raise HTTPException(502, str(exc))
+
+    symptom_ins = extracted_profile_to_symptom_ins(payload.free_text, extracted)
+
+    patient_state = build_patient_state(client, patient)
+    input_payload = {
+        "symptoms": [s.model_dump() for s in symptom_ins],
+        "medication_logs": [],
+        "wearable": {},
+        "vitals": {},
+        "caregiver_notes": None,
+    }
+    workflow_state = await run_workflow(
+        patient_id=patient_id,
+        trigger_reason="patient_symptom_assessment",
+        input_payload=input_payload,
+        patient_state=patient_state,
+    )
+
+    # Same ordering requirement as trigger_neurological_assessment above:
+    # persist_workflow() must run before the observations insert, since
+    # observations.workflow_id has a foreign key to workflows.id.
+    persist_workflow(client, workflow_state)
+
+    observation_rows = [
+        {
+            "patient_id": patient_id,
+            "workflow_id": workflow_state.workflow_id,
+            "modality": "symptom",
+            "payload": s.model_dump(),
+        }
+        for s in symptom_ins
+    ]
+    if observation_rows:
+        client.table("observations").insert(observation_rows).execute()
+
+    assessment_row = {
+        "patient_id": patient_id,
+        "workflow_id": workflow_state.workflow_id,
+        "free_text": payload.free_text,
+        "extracted_json": extracted.model_dump(),
+    }
+    assessment_result = client.table("symptom_assessments").insert(assessment_row).execute()
+    assessment = assessment_result.data[0] if assessment_result.data else None
+
+    return {
+        "assessment": assessment,
+        "extracted": extracted.model_dump(),
+        "workflow": _serialize_workflow(workflow_state),
+    }
+
+
+@router.get("/symptom-assessment/{patient_id}/history")
+def list_symptom_assessments(patient_id: str, user: dict = Depends(get_current_user)):
+    client = get_authed_client(user["_access_token"])
+    result = (
+        client.table("symptom_assessments")
+        .select("*")
+        .eq("patient_id", patient_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return result.data
 
 
 @router.get("/{workflow_id}")

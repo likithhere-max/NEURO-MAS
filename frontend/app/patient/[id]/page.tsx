@@ -1,146 +1,150 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { api, loadSession } from "@/lib/api";
+import { useState } from "react";
+import Link from "next/link";
+import { usePatient } from "@/components/PatientContext";
+import { loadSession } from "@/lib/api";
+import RiskBadge from "@/components/RiskBadge";
 import AgentActivityPanel from "@/components/AgentActivityPanel";
 import ConsensusPanel from "@/components/ConsensusPanel";
-import TimelinePanel from "@/components/TimelinePanel";
 import PersonalizationPanel from "@/components/PersonalizationPanel";
 import ActionsPanel from "@/components/ActionsPanel";
 import AlertCenter from "@/components/AlertCenter";
-
-const PRESETS: Record<string, any> = {
-  epilepsy_emergency: {
-    label: "Preset: Epilepsy emergency event",
-    trigger_reason: "patient_reported_unusual_event",
-    observations: {
-      symptoms: [{ name: "seizure", severity: "severe", free_text: "seizure not stopping, status epilepticus, over 5 minutes and not regaining consciousness" }],
-      medication_logs: [{ name: "levetiracetam", taken: false, scheduled_time: "08:00" }],
-      wearable: {},
-      vitals: {},
-      caregiver_notes: "Caregiver reports the seizure has continued for several minutes without stopping.",
-    },
-  },
-  parkinsons_deterioration: {
-    label: "Preset: Parkinson's tremor/gait deterioration",
-    trigger_reason: "wearable_trend_deviation",
-    observations: {
-      symptoms: [{ name: "tremor", severity: "moderate", free_text: "increased hand tremor and slower walking today" }],
-      medication_logs: [{ name: "levodopa", taken: false, scheduled_time: "07:00" }],
-      wearable: { tremor_amplitude: 1.7, gait_speed_m_s: 0.85 },
-      vitals: {},
-      caregiver_notes: null,
-    },
-  },
-  routine_checkin: {
-    label: "Preset: Routine low-risk check-in",
-    trigger_reason: "routine_check_in",
-    observations: {
-      symptoms: [{ name: "mild headache", severity: "low", free_text: "slight headache, otherwise feeling okay" }],
-      medication_logs: [],
-      wearable: {},
-      vitals: {},
-      caregiver_notes: null,
-    },
-  },
-};
+import TimelinePanel from "@/components/TimelinePanel";
 
 export default function PatientDashboard() {
-  const router = useRouter();
-  const params = useParams();
-  const patientId = params.id as string;
+  const { patientId, latestAssessment, latestWorkflow, alerts, timeline, refreshAll, loadingWorkflow } = usePatient();
+  const [showPipeline, setShowPipeline] = useState(false);
+  const { role } = loadSession();
 
-  const [role, setRole] = useState<string | null>(null);
-  const [patient, setPatient] = useState<any>(null);
-  const [workflow, setWorkflow] = useState<any>(null);
-  const [timeline, setTimeline] = useState<any[]>([]);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [preset, setPreset] = useState("epilepsy_emergency");
-
-  async function refreshSideData() {
-    const [t, a] = await Promise.all([api.getTimeline(patientId), api.getPatientAlerts(patientId)]);
-    setTimeline(t);
-    setAlerts(a);
+  if (loadingWorkflow) {
+    return <div className="text-sm text-neuro-muted">Loading assessment…</div>;
   }
 
-  useEffect(() => {
-    const { token, role } = loadSession();
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    setRole(role);
-    api.getPatient(patientId).then(setPatient).catch((e) => setError(e.message));
-    refreshSideData().catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId]);
-
-  async function runWorkflow() {
-    setRunning(true);
-    setError(null);
-    try {
-      const result = await api.triggerWorkflow(patientId, PRESETS[preset]);
-      setWorkflow(result);
-      await refreshSideData();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setRunning(false);
-    }
+  if (!latestWorkflow) {
+    return (
+      <div className="card text-center py-12">
+        <div className="text-lg font-semibold mb-2">No assessment yet</div>
+        <p className="text-sm text-neuro-muted mb-4 max-w-md mx-auto">
+          Describe symptoms in the patient&apos;s own words to run the full neurological multi-agent
+          assessment — candidate conditions, risk, evidence, and next steps.
+        </p>
+        <Link
+          href={`/patient/${patientId}/assessment`}
+          className="inline-block bg-neuro-accent text-neuro-bg font-medium rounded-lg px-4 py-2 text-sm"
+        >
+          Start Symptom Assessment
+        </Link>
+      </div>
+    );
   }
 
-  if (!patient) {
-    return <div className="text-sm text-neuro-muted">Loading patient...</div>;
-  }
+  const diagnostic = latestWorkflow.agent_results?.neuro_diagnostic_agent?.raw_payload || {};
+  const risk = latestWorkflow.agent_results?.risk_stratification_agent?.raw_payload || {};
+  const personalization = latestWorkflow.agent_results?.personalization_agent?.raw_payload || {};
+  const topCandidates = (diagnostic.candidate_conditions || []).slice(0, 3);
+  const extracted = latestAssessment?.extracted_json || {};
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <button onClick={() => router.push("/")} className="text-xs text-neuro-muted mb-1">&larr; all patients</button>
-          <h1 className="text-xl font-semibold">{patient.full_name}</h1>
-          <div className="text-sm text-neuro-muted">
-            {patient.age ? `${patient.age} yo` : ""} {patient.sex || ""} ·{" "}
-            {patient.conditions.map((c: string) => <span key={c} className="badge badge-info ml-1">{c}</span>)}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <select value={preset} onChange={(e) => setPreset(e.target.value)}
-            className="bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm">
-            {Object.entries(PRESETS).map(([key, p]: any) => (
-              <option key={key} value={key}>{p.label}</option>
-            ))}
-          </select>
-          <button onClick={runWorkflow} disabled={running}
-            className="bg-neuro-accent text-neuro-bg font-medium rounded-lg px-4 py-2 text-sm disabled:opacity-50">
-            {running ? "Agents working..." : "Trigger assessment"}
-          </button>
-        </div>
-      </div>
-
-      {error && <div className="text-neuro-critical text-sm mb-3">{error}</div>}
-
-      {workflow?.is_emergency && (
-        <div className="mb-4 rounded-lg border border-neuro-critical bg-neuro-critical/10 px-4 py-3 text-sm text-neuro-critical font-medium">
-          ⚠ Deterministic emergency detector triggered — Level 4 escalation fired automatically, independent of
-          agent consensus.
+    <div className="space-y-6">
+      {latestWorkflow.is_emergency && (
+        <div className="rounded-lg border border-neuro-critical bg-neuro-critical/10 px-4 py-3 text-sm text-neuro-critical font-medium">
+          ⚠ Deterministic emergency detector triggered on this assessment — independent of agent consensus. If this
+          reflects a real emergency, seek immediate care.
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <AgentActivityPanel agentResults={workflow?.agent_results || {}} />
-          <ConsensusPanel consensus={workflow?.consensus} />
-          <PersonalizationPanel agentResults={workflow?.agent_results || {}} />
+        <div className="card">
+          <div className="text-xs text-neuro-muted mb-1">Main symptoms reported</div>
+          <div className="flex flex-wrap gap-1">
+            {(extracted.symptoms || []).map((s: any, i: number) => (
+              <span key={i} className="badge badge-info">
+                {s.name}
+              </span>
+            ))}
+            {(extracted.symptoms || []).length === 0 && <span className="text-sm text-neuro-muted">none extracted</span>}
+          </div>
         </div>
-        <div className="space-y-6">
-          <ActionsPanel actions={workflow?.proposed_actions || []} role={role} onChanged={refreshSideData} />
-          <AlertCenter alerts={alerts} onChanged={refreshSideData} />
-          <TimelinePanel events={workflow?.audit_trail || timeline} />
+        <div className="card">
+          <div className="text-xs text-neuro-muted mb-1">Current risk</div>
+          <RiskBadge bucket={risk.overall_bucket} size="lg" />
+          <Link href={`/patient/${patientId}/risk`} className="block text-xs text-neuro-accent mt-2">
+            Why? &rarr;
+          </Link>
         </div>
+        <div className="card">
+          <div className="text-xs text-neuro-muted mb-1">Last updated</div>
+          <div className="text-sm">{new Date(latestWorkflow.started_at).toLocaleString()}</div>
+          <Link href={`/patient/${patientId}/assessment`} className="block text-xs text-neuro-accent mt-2">
+            Update assessment &rarr;
+          </Link>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold">AI assessment — candidate conditions considered</h2>
+          <Link href={`/patient/${patientId}/analysis`} className="text-xs text-neuro-accent">
+            Full analysis &rarr;
+          </Link>
+        </div>
+        {topCandidates.length === 0 && <div className="text-sm text-neuro-muted">No candidate conditions matched.</div>}
+        <div className="space-y-2">
+          {topCandidates.map((c: any) => (
+            <div key={c.disease_id} className="flex items-center justify-between border border-neuro-border rounded-lg px-3 py-2">
+              <span className="text-sm">{c.preferred_name}</span>
+              <span className="text-xs text-neuro-muted">{Math.round((c.confidence || 0) * 100)}% match</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-[11px] text-neuro-muted mt-3">
+          AI-generated candidate conditions for clinician review — not a confirmed diagnosis.
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card">
+          <h2 className="font-semibold mb-2">Recommended next action</h2>
+          <p className="text-sm text-neuro-text">
+            {latestWorkflow.is_emergency
+              ? "Seek immediate emergency medical care."
+              : personalization.monitoring_plan?.[0] || "No specific action suggested yet."}
+          </p>
+          <Link href={`/patient/${patientId}/next-steps`} className="block text-xs text-neuro-accent mt-2">
+            See full next steps &rarr;
+          </Link>
+        </div>
+        <div className="card">
+          <h2 className="font-semibold mb-2">Ask the AI Assistant</h2>
+          <p className="text-sm text-neuro-muted mb-3">Ask about your assessment, risk, or what to do next.</p>
+          <Link
+            href={`/patient/${patientId}/chat`}
+            className="inline-block bg-neuro-accent text-neuro-bg font-medium rounded-lg px-4 py-2 text-sm"
+          >
+            Open AI Assistant
+          </Link>
+        </div>
+      </div>
+
+      <div>
+        <button onClick={() => setShowPipeline((v) => !v)} className="text-sm text-neuro-accent mb-3">
+          {showPipeline ? "Hide" : "Show"} analysis pipeline (technical detail) {showPipeline ? "▲" : "▼"}
+        </button>
+        {showPipeline && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <AgentActivityPanel agentResults={latestWorkflow.agent_results || {}} />
+              <ConsensusPanel consensus={latestWorkflow.consensus} />
+              <PersonalizationPanel agentResults={latestWorkflow.agent_results || {}} />
+            </div>
+            <div className="space-y-6">
+              <ActionsPanel actions={latestWorkflow.proposed_actions || []} role={role} onChanged={refreshAll} />
+              <AlertCenter alerts={alerts} onChanged={refreshAll} />
+              <TimelinePanel events={latestWorkflow.audit_trail || timeline} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

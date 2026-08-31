@@ -1,7 +1,7 @@
 from __future__ import annotations
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import agents, alerts, auth, knowledge, ml_demo, patients, workflows
+from app.api.routes import agents, alerts, auth, chat, knowledge, ml_demo, patients, workflows
 from app.core.config import get_settings
 from app.db.session import Base, engine
 from app.services.auth import get_current_user
@@ -29,6 +29,7 @@ app.include_router(knowledge.router, prefix=settings.api_v1_prefix)
 app.include_router(alerts.router, prefix=settings.api_v1_prefix)
 app.include_router(agents.router, prefix=settings.api_v1_prefix)
 app.include_router(ml_demo.router, prefix=settings.api_v1_prefix)
+app.include_router(chat.router, prefix=settings.api_v1_prefix)
 @app.get("/")
 def root():
     return {

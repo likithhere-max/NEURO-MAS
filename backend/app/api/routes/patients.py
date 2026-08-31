@@ -18,6 +18,20 @@ from app.services.auth import get_current_user
 router = APIRouter(prefix="/patients", tags=["patients"])
 
 
+def _fetch_condition_names(client, patient_id: str) -> list[str]:
+    """
+    Real lookup against the `conditions` table, replacing the previous
+    hardcoded `conditions=[]` that every read endpoint below returned
+    regardless of what POST /patients/{id}/conditions had actually stored
+    (2-day review sprint fix -- caught while building the frontend Profile/
+    Dashboard tabs, which need this to be real). N+1 in list_patients is an
+    accepted tradeoff for this prototype's patient volume; a batched
+    `.in_("patient_id", [...])` query would be the fix if that ever matters.
+    """
+    rows = client.table("conditions").select("preferred_name").eq("patient_id", patient_id).execute().data
+    return [r["preferred_name"] for r in rows]
+
+
 # -- MIGRATED to Supabase (real RLS, real auth) -----------------------------
 
 @router.post("", response_model=PatientOut)
@@ -52,7 +66,7 @@ def get_patient(patient_id: str, user: dict = Depends(get_current_user)):
     if not result.data:
         raise HTTPException(404, "patient not found")
     p = result.data[0]
-    return PatientOut(id=p["id"], full_name=p["full_name"], age=p["age"], sex=p["sex"], conditions=[])
+    return PatientOut(id=p["id"], full_name=p["full_name"], age=p["age"], sex=p["sex"], conditions=_fetch_condition_names(client, patient_id))
 
 
 @router.get("")
@@ -60,7 +74,7 @@ def list_patients(user: dict = Depends(get_current_user)):
     client = get_authed_client(user["_access_token"])
     result = client.table("patients").select("*").execute()
     return [
-        PatientOut(id=p["id"], full_name=p["full_name"], age=p["age"], sex=p["sex"], conditions=[])
+        PatientOut(id=p["id"], full_name=p["full_name"], age=p["age"], sex=p["sex"], conditions=_fetch_condition_names(client, p["id"]))
         for p in result.data
     ]
 

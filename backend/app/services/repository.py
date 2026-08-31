@@ -227,3 +227,109 @@ def persist_workflow(client: Client, state: WorkflowState) -> dict:
         client.table("alerts").insert(alert_rows).execute()
 
     return wf
+
+
+def build_case_context(client: Client, patient_id: str, patient: dict | None = None) -> dict:
+    """
+    Compact, structured summary of a patient's most recent assessment --
+    NOT a raw dump of workflow/agent-event rows. Built for two consumers:
+    the AI Assistant chat (app/services/chat_assistant.py) and, later, any
+    "explain this result" UI panel. Kept in one place (repository.py, next
+    to build_patient_state) so both stay in sync with the real DB shape
+    instead of each re-deriving it independently.
+
+    Returns {"has_assessment": False, ...} rather than raising when the
+    patient has no workflow yet -- an empty case is a normal state, not an
+    error.
+    """
+    if patient is None:
+        patient_result = client.table("patients").select("*").eq("id", patient_id).execute()
+        patient = patient_result.data[0] if patient_result.data else {}
+
+    context: dict = {
+        "patient": {
+            "full_name": patient.get("full_name"),
+            "age": patient.get("age"),
+            "sex": patient.get("sex"),
+        },
+        "has_assessment": False,
+    }
+
+    conditions_rows = client.table("conditions").select("preferred_name").eq("patient_id", patient_id).execute().data
+    context["patient"]["known_conditions"] = [c["preferred_name"] for c in conditions_rows]
+
+    wf_result = (
+        client.table("workflows")
+        .select("*")
+        .eq("patient_id", patient_id)
+        .order("started_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not wf_result.data:
+        return context
+    wf = wf_result.data[0]
+
+    events = (
+        client.table("agent_event_log")
+        .select("*")
+        .eq("workflow_id", wf["id"])
+        .execute()
+        .data
+    )
+    by_agent = {e["agent_name"]: e["result_json"] for e in events}
+
+    assessment_result = (
+        client.table("symptom_assessments")
+        .select("*")
+        .eq("workflow_id", wf["id"])
+        .limit(1)
+        .execute()
+    )
+    assessment = assessment_result.data[0] if assessment_result.data else None
+
+    diagnostic = by_agent.get("neuro_diagnostic_agent", {}).get("raw_payload", {})
+    risk = by_agent.get("risk_stratification_agent", {}).get("raw_payload", {})
+    knowledge = by_agent.get("knowledge_agent", {}).get("raw_payload", {})
+    personalization = by_agent.get("personalization_agent", {}).get("raw_payload", {})
+    data_intake = by_agent.get("data_intake_agent", {}).get("raw_payload", {})
+
+    extracted = (assessment or {}).get("extracted_json") or {}
+
+    context.update({
+        "has_assessment": True,
+        "workflow_id": wf["id"],
+        "assessed_at": wf["started_at"],
+        "trigger_reason": wf["trigger_reason"],
+        "is_emergency": wf["is_emergency"],
+        "reported_symptoms": [s.get("name") for s in extracted.get("symptoms", [])] if extracted else None,
+        "associated_features": extracted.get("associated_features") if extracted else None,
+        "symptom_duration": extracted.get("duration") if extracted else None,
+        "symptom_progression": extracted.get("progression") if extracted else None,
+        "diagnostic_candidates": [
+            {
+                "name": c.get("preferred_name"),
+                "confidence": c.get("confidence"),
+                "matched_terms": c.get("matched_terms"),
+            }
+            for c in diagnostic.get("candidate_conditions", [])[:5]
+        ],
+        "diagnostic_red_flags": diagnostic.get("red_flags", []),
+        "diagnostic_missing_information": diagnostic.get("missing_information", []),
+        "risk_scores": risk.get("heuristic_scores", {}),
+        "risk_overall_bucket": risk.get("overall_bucket"),
+        "evidence_citations": [
+            {"condition": c.get("disease"), "source_url": c.get("source_url")}
+            for c in knowledge.get("citations", [])
+        ],
+        "monitoring_plan": personalization.get("monitoring_plan", []),
+        "personalization_reasons": personalization.get("personalization_reasons", []),
+        "urgency": data_intake.get("urgency"),
+        "data_quality": data_intake.get("data_quality"),
+        "reasoning_summaries": {
+            agent_name: result.get("reasoning_summary")
+            for agent_name, result in by_agent.items()
+            if result.get("reasoning_summary")
+        },
+    })
+    return context

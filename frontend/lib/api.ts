@@ -3,7 +3,6 @@
 // storage rules aside, a real clinical frontend should use httpOnly cookies or
 // a proper session -- localStorage token storage is a prototype convenience,
 // flagged in docs/SIMULATED_VS_REAL.md).
-
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
 let inMemoryToken: string | null = null;
@@ -42,7 +41,6 @@ async function request(path: string, options: RequestInit = {}) {
     ...(options.headers as Record<string, string> | undefined),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const text = await res.text();
@@ -54,21 +52,9 @@ async function request(path: string, options: RequestInit = {}) {
 
 export const api = {
   register: (email: string, password: string, full_name: string, role: string) =>
-    request("/auth/register", { method: "POST", body: JSON.stringify({ email, password, full_name, role }) }),
-
-  login: async (email: string, password: string) => {
-    const form = new URLSearchParams();
-    form.set("username", email);
-    form.set("password", password);
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString(),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  },
-
+    request("/auth/signup", { method: "POST", body: JSON.stringify({ email, password, full_name, role }) }),
+  login: (email: string, password: string) =>
+    request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   listPatients: () => request("/patients"),
   getPatient: (id: string) => request(`/patients/${id}`),
   createPatient: (payload: any) => request("/patients", { method: "POST", body: JSON.stringify(payload) }),
@@ -78,16 +64,24 @@ export const api = {
   getRisk: (id: string) => request(`/patients/${id}/risk`),
   getPatientAlerts: (id: string) => request(`/patients/${id}/alerts`),
   getExplanations: (id: string, workflowId: string) => request(`/patients/${id}/explanations?workflow_id=${workflowId}`),
-
   triggerWorkflow: (patientId: string, payload: any) =>
     request(`/workflows/neurological-assessment/${patientId}`, { method: "POST", body: JSON.stringify(payload) }),
   getWorkflow: (id: string) => request(`/workflows/${id}`),
-
   searchKnowledge: (query: string) => request("/knowledge/search", { method: "POST", body: JSON.stringify({ query, top_k: 5 }) }),
   listDiseases: () => request("/knowledge/diseases"),
-
+  getDisease: (diseaseId: string) => request(`/knowledge/diseases/${diseaseId}`),
   acknowledgeAlert: (id: string) => request(`/alerts/${id}/acknowledge`, { method: "POST", body: JSON.stringify({}) }),
   approveAction: (id: string) => request(`/alerts/actions/${id}/approve`, { method: "POST" }),
-
   agentsStatus: () => request("/agents/status"),
+  addCondition: (patientId: string, payload: any) =>
+    request(`/patients/${patientId}/conditions`, { method: "POST", body: JSON.stringify(payload) }),
+  // Real natural-language symptom assessment (2-day review sprint feature).
+  triggerSymptomAssessment: (patientId: string, payload: any) =>
+    request(`/workflows/symptom-assessment/${patientId}`, { method: "POST", body: JSON.stringify(payload) }),
+  getSymptomAssessmentHistory: (patientId: string) =>
+    request(`/workflows/symptom-assessment/${patientId}/history`),
+  // Context-aware AI Assistant chat (2-day review sprint feature).
+  getChatHistory: (patientId: string) => request(`/patients/${patientId}/chat/history`),
+  sendChat: (patientId: string, message: string) =>
+    request(`/patients/${patientId}/chat`, { method: "POST", body: JSON.stringify({ message }) }),
 };
