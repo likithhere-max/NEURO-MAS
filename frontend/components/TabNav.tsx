@@ -9,6 +9,7 @@ function tabs(id: string) {
     { href: `/patient/${id}/assessment`, label: "Symptom Assessment" },
     { href: `/patient/${id}/analysis`, label: "Analysis" },
     { href: `/patient/${id}/risk`, label: "Risk" },
+    { href: `/patient/${id}/longitudinal`, label: "Longitudinal" },
     { href: `/patient/${id}/evidence`, label: "Evidence" },
     { href: `/patient/${id}/next-steps`, label: "Next Steps" },
     { href: `/patient/${id}/chat`, label: "AI Assistant" },

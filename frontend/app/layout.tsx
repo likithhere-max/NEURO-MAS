@@ -23,8 +23,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
             </a>
-            <div className="text-[11px] text-neuro-muted border border-neuro-border rounded-full px-3 py-1">
-              PROTOTYPE — for clinician use, not a diagnostic device
+            <div className="flex items-center gap-4">
+              <a href="/ml-lab" className="text-[12px] text-neuro-muted hover:text-neuro-accent2 transition-colors">
+                ML Lab
+              </a>
+              <div className="text-[11px] text-neuro-muted border border-neuro-border rounded-full px-3 py-1">
+                PROTOTYPE — for clinician use, not a diagnostic device
+              </div>
             </div>
           </header>
           <main className="px-6 py-6 max-w-7xl mx-auto">{children}</main>

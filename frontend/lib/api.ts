@@ -38,6 +38,9 @@ async function request(path: string, options: RequestInit = {}) {
   const { token } = loadSession();
   const headers: Record<string, string> = {
     ...(options.body ? { "Content-Type": "application/json" } : {}),
+    // Lets requests through ngrok's free-tier browser-warning interstitial
+    // (harmless no-op against any other host, e.g. Render/Railway).
+    "ngrok-skip-browser-warning": "true",
     ...(options.headers as Record<string, string> | undefined),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -84,4 +87,21 @@ export const api = {
   getChatHistory: (patientId: string) => request(`/patients/${patientId}/chat/history`),
   sendChat: (patientId: string, message: string) =>
     request(`/patients/${patientId}/chat`, { method: "POST", body: JSON.stringify({ message }) }),
+  // ML Lab: standalone Phase-3 demonstration models (backend/app/api/routes/ml_demo.py).
+  // Deliberately NOT patient-scoped -- these never read/write patient data, matching the
+  // backend's own two-track decoupling design.
+  mlClassifierInfo: () => request("/demo/parkinsons-classifier/info"),
+  mlClassify: (payload: Record<string, number>) =>
+    request("/demo/parkinsons-classifier", { method: "POST", body: JSON.stringify(payload) }),
+  mlRiskClassifierInfo: () => request("/demo/parkinsons-risk-classifier/info"),
+  mlRiskClassify: (payload: Record<string, number>) =>
+    request("/demo/parkinsons-risk-classifier", { method: "POST", body: JSON.stringify(payload) }),
+  // Longitudinal / personal-baseline tracking (feeds longitudinal_agent's real
+  // baseline-comparison + own-history anomaly detection -- see backend/app/services/repository.py).
+  addMetricReading: (patientId: string, payload: { metric: string; value: number; recorded_at?: string }) =>
+    request(`/patients/${patientId}/metric-readings`, { method: "POST", body: JSON.stringify(payload) }),
+  addLongitudinalMetric: (
+    patientId: string,
+    payload: { metric: string; baseline_value?: number; current_value?: number; window?: string }
+  ) => request(`/patients/${patientId}/longitudinal-metrics`, { method: "POST", body: JSON.stringify(payload) }),
 };
