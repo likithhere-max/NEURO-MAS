@@ -40,7 +40,11 @@ info = check("GET model info", requests.get(f"{BASE}/demo/parkinsons-classifier/
 info_data = info.json()
 print("model:", info_data["model"])
 print("dataset:", info_data["dataset"])
-print("test_metrics:", info_data["test_metrics"])
+# NOTE: this was "test_metrics" until the LOSO revision replaced the single
+# train/test split with pooled leave-one-subject-out metrics. The route returns
+# the saved metadata verbatim, so the key follows whatever training wrote.
+print("loso_metrics:", info_data["loso_metrics"])
+print("evaluation_strategy:", info_data["evaluation_strategy"])
 print("disclaimer:", info_data["disclaimer"])
 print()
 
