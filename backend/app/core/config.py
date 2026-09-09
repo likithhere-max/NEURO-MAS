@@ -49,7 +49,14 @@ class Settings(BaseSettings):
     consensus_disagreement_threshold: float = 0.4
     min_confidence_for_autonomous_action: float = 0.6
     # --- CORS ---
-    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # "*" added 2026-09-02 as a same-day-review convenience: the frontend is
+    # being hosted on Netlify (URL not known/fixed yet) and the backend is
+    # being reached through a temporary ngrok tunnel, so the exact origin
+    # can't be pinned in advance. Safe here because this API is
+    # Bearer-token-authenticated (no cookies), never allow_credentials-reliant
+    # in practice. Replace "*" with the real Netlify URL once it's stable and
+    # remove this note.
+    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "*"]
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
