@@ -64,9 +64,14 @@ export default function SymptomAssessmentPage() {
       setStepIndex((i) => Math.min(i + 1, LOADING_STEPS.length - 1));
     }, 1400);
 
-    const effectiveFreeText = priorText
-      ? `Previously reported: ${priorText}\n\nNew update: ${freeText.trim()}`
-      : freeText.trim();
+    // IMPORTANT: `priorText` (latestAssessment.free_text) is already the full
+    // cumulative history from every prior update -- it may itself already
+    // contain earlier "Update:" labels. Appending a single new "Update:"
+    // line grows this linearly, one label per turn. Previously this
+    // re-wrapped the whole prior text in ANOTHER "Previously reported:"
+    // label every time, which compounded ("Previously reported: Previously
+    // reported: ...") after just two updates -- fixed here.
+    const effectiveFreeText = priorText ? `${priorText}\n\nUpdate: ${freeText.trim()}` : freeText.trim();
 
     try {
       const res = await runAssessment({
