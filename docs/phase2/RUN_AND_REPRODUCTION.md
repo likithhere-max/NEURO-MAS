@@ -46,7 +46,7 @@ and the ML demo can return `abstained: true` with null label/probabilities.
 | `PERSIST_VIA_RPC` | false | use the atomic `persist_workflow_atomic` SQL function (apply migration first) |
 | `DDI_SNAPSHOT_PATH` | empty | path to an owner-supplied versioned DDI snapshot JSON |
 | `EXTERNAL_PROCESSING_MODE` | `redacted` | `disabled | redacted | unredacted` |
-| `REQUIRE_PATIENT_CONSENT` | true | gate patient-scoped LLM calls on `patients.external_ai_consent` |
+| `REQUIRE_PATIENT_CONSENT` | false (was true until 2026-10-24; owner decision: AI always on) | when true, gate patient-scoped LLM calls on `patients.external_ai_consent` |
 | `AUTO_CONFIRM_EMAIL` | false | development only |
 | `NOTIFICATION_CHANNEL` (`none | smtp`), `SMTP_*`, `NOTIFICATION_MAX_ATTEMPTS`, `NOTIFICATION_ATTEMPT_TIMEOUT_S`, `NOTIFICATION_BACKOFF_BASE_S` | `none` | notification delivery |
 | `METRIC_STABLE_BAND`, `METRIC_ADVERSE_THRESHOLD`, `METRIC_MCID_PATH` | 0.05, 0.20, empty | provisional change thresholds; MCID file entries need `approved_by` and `source` |

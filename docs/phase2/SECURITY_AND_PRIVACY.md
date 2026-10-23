@@ -56,3 +56,6 @@ message has ever been sent from this repository. `NOTIFICATION_CHANNEL` defaults
 6. Confirm the LLM provider's data-processing terms for your key/plan and your legal basis for sending health data; the consent gate is a technical control, not that analysis.
 7. Rotate any key that was ever committed or pasted anywhere, regardless of this scan's result.
 8. Run a dependency vulnerability scan and an independent security review before any real-patient use.
+
+---
+*Update 2026-10-24 (owner decision).* The default of `REQUIRE_PATIENT_CONSENT` is now `false`: external LLM calls no longer need `external_ai_consent = true`. Redaction still applies. Set `REQUIRE_PATIENT_CONSENT=true` to restore the fail-closed gate described above. Use fictional patients only while it is off.

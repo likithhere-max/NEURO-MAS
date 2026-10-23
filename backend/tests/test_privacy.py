@@ -47,8 +47,27 @@ def policy(monkeypatch, **kw):
 
 
 # ------------------------------------------------------------------ decisions
-def test_default_policy_blocks_without_scope_or_consent(monkeypatch, sent):
-    policy(monkeypatch)
+def test_default_policy_allows_external_ai_without_consent(monkeypatch, sent):
+    """Owner decision 2026-10-24: AI is always on by default; the consent gate is opt-in (REQUIRE_PATIENT_CONSENT=true).
+    Redaction (default mode 'redacted') still applies."""
+    s = policy(monkeypatch)
+    assert s.require_patient_consent is False and s.external_processing_mode == "redacted"
+    gs.generate_structured("hello", Out)                       # no scope at all: allowed
+    with privacy.processing_scope(purpose="t", consent=False):
+        gs.generate_structured("hello again", Out)             # no consent recorded: allowed
+    assert len(sent.calls) == 2
+
+
+def test_disabled_mode_still_blocks_everything_by_default_consent_setting(monkeypatch, sent):
+    policy(monkeypatch, external_processing_mode="disabled")
+    with privacy.processing_scope(purpose="t", consent=True):
+        with pytest.raises(gs.ExternalProcessingBlockedError, match="external_processing_disabled_by_policy"):
+            gs.generate_structured("hello", Out)
+    assert sent.calls == []
+
+
+def test_gate_blocks_without_scope_or_consent_when_enabled(monkeypatch, sent):
+    policy(monkeypatch, require_patient_consent=True)
     with pytest.raises(gs.ExternalProcessingBlockedError, match="no_processing_scope"):
         gs.generate_structured("hello", Out)
     with privacy.processing_scope(purpose="t", consent=False):
@@ -93,7 +112,7 @@ def test_consent_requirement_can_be_switched_off_for_synthetic_deployments(monke
 
 
 def test_embedding_calls_obey_the_same_gate(monkeypatch):
-    policy(monkeypatch)
+    policy(monkeypatch, require_patient_consent=True)
     monkeypatch.setattr(gs, "_call_embed", lambda *a: (_ for _ in ()).throw(AssertionError("must not be called")))
     with pytest.raises(gs.ExternalProcessingBlockedError):
         gs.embed_text("my symptoms")
@@ -161,7 +180,7 @@ SYMPTOMS = {"symptoms": [{"name": "resting tremor", "free_text": "Jane Doe: my h
 
 @pytest.mark.asyncio
 async def test_workflow_without_consent_sends_nothing_and_reports_it(monkeypatch, sent):
-    policy(monkeypatch)
+    policy(monkeypatch, require_patient_consent=True)
     r = await run_workflow(patient_id="p", trigger_reason="t", input_payload=SYMPTOMS,
                            patient_state=PatientState(patient_id="p", redaction_identifiers=["Jane Doe"]))
     assert sent.calls == []
@@ -209,10 +228,10 @@ class _C:
     def table(self, name): return _Q([self.patient] if name == "patients" else [])
 
 
-def _symptom_post(monkeypatch, consent):
+def _symptom_post(monkeypatch, consent, gate=True):
     app.dependency_overrides[get_current_user] = lambda: {"sub": "doc", "_access_token": "t"}
     monkeypatch.setattr(wf_routes, "get_authed_client", lambda t: _C({**PATIENT, "external_ai_consent": consent}))
-    policy(monkeypatch)
+    policy(monkeypatch, require_patient_consent=gate)
     called = []
 
     async def fake_extract(payload):
@@ -229,6 +248,11 @@ def _symptom_post(monkeypatch, consent):
 def test_symptom_assessment_without_consent_is_403_and_extraction_never_runs(monkeypatch):
     r, called = _symptom_post(monkeypatch, consent=False)
     assert r.status_code == 403 and "consent_not_recorded" in r.text and called == []
+
+
+def test_symptom_assessment_reaches_extraction_without_consent_by_default(monkeypatch):
+    r, called = _symptom_post(monkeypatch, consent=False, gate=False)
+    assert called == [1] and r.status_code == 502        # default policy: the gate does not stop extraction
 
 
 def test_symptom_assessment_with_consent_reaches_extraction(monkeypatch):

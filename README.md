@@ -26,7 +26,7 @@ uvicorn app.main:app --reload --port 8000
 
 API docs: http://localhost:8000/docs
 
-Run the test suite (944 passed, 26 skipped as of Phase 6 — live Supabase/Gemini and RLS tests need a test project; see docs/phase2/INTEGRATION_TEST_REPORT.md). A green run says nothing about real-data model validation: no test uses the UCI files. That is a separate command with its own exit code (`python -m ml.validation.workflow run`, exit 2 = NOT_RUN; see docs/phase6/FINAL_READINESS_REPORT.md):
+Run the test suite (947 passed, 26 skipped as of 2026-10-24 — live Supabase/Gemini and RLS tests need a test project; see docs/phase2/INTEGRATION_TEST_REPORT.md). A green run says nothing about real-data model validation: no test uses the UCI files. That is a separate command with its own exit code (`python -m ml.validation.workflow run`, exit 2 = NOT_RUN; see docs/phase6/FINAL_READINESS_REPORT.md):
 
 ```bash
 python -m pytest tests -q --cov=app --cov=ml

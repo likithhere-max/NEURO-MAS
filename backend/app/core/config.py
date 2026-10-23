@@ -62,8 +62,10 @@ class Settings(BaseSettings):
     # redacted   : (default) best-effort masking of identifiers before sending
     # unredacted : send as-is (only for synthetic data / explicit owner decision)
     external_processing_mode: str = "redacted"
-    # A patient-scoped external call needs patients.external_ai_consent = true (default false => fail closed).
-    require_patient_consent: bool = True
+    # Owner decision (2026-10-24): AI is always on. A patient-scoped external call does NOT need patients.external_ai_consent.
+    # Set REQUIRE_PATIENT_CONSENT=true to restore the per-patient consent gate (fail closed unless external_ai_consent = true).
+    # Redaction (EXTERNAL_PROCESSING_MODE=redacted) still applies.
+    require_patient_consent: bool = False
     # --- Notifications (app/services/notification_dispatch.py) ---
     # "none" (default): nothing is ever sent and actions stay 'proposed'. "smtp": real e-mail via the settings below.
     notification_channel: str = "none"

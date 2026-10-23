@@ -5,7 +5,7 @@ All Gemini traffic goes through app/ai/gemini_service.py; that module calls `aut
 sending anything. The decision depends on
 
   * EXTERNAL_PROCESSING_MODE  disabled | redacted (default) | unredacted
-  * REQUIRE_PATIENT_CONSENT   default true: a patient-scoped call is blocked unless that patient's record says
+  * REQUIRE_PATIENT_CONSENT   default FALSE since 2026-10-24 (owner decision: AI always on); when true, a patient-scoped call is blocked unless that patient's record says
                               `external_ai_consent = true` (default false; fail closed)
   * the ProcessingContext     set by whoever knows the patient (orchestrator, chat, symptom-assessment route)
 
@@ -84,7 +84,7 @@ def decide(kind: str) -> Decision:
     if mode == "disabled":
         return Decision(False, "external_processing_disabled_by_policy", mode, True)
     ctx = current_context()
-    if getattr(s, "require_patient_consent", True):
+    if getattr(s, "require_patient_consent", False):
         if ctx is None:
             return Decision(False, "no_processing_scope: caller did not declare patient consent or a system purpose", mode, True)
         if not ctx.system and not ctx.consent:

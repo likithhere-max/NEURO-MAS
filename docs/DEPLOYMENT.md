@@ -20,14 +20,10 @@ git push -u origin phase2/advanced-ml-hardening
 Deploy from that branch (Render: Branch field; Netlify: Production branch). If you would rather deploy `main`, merge the branch into it first; `main` does not contain the Dockerfile or `render.yaml`.
 
 ## 1. Supabase (5 min)
-1. SQL Editor: run `backend/scripts/migration_phase2_privacy.sql` (adds the patient AI-consent columns). The other Phase 2 migrations are not needed with the default settings.
+1. No SQL migration is required for the demo. (`backend/scripts/migration_phase2_privacy.sql` only matters if you later turn the consent gate back on.)
 2. Authentication -> URL Configuration: set **Site URL** to your Netlify URL once you have it (step 4). Until then confirmation emails link to the wrong place.
 3. Accounts: signup now sends a confirmation email, and clinician signup needs `CLINICIAN_INVITE_CODE`. For the review, **reuse accounts that already work** or create them in advance (Authentication -> Users -> Add user -> tick Auto Confirm User, then make sure a matching row exists in `profiles`; the app's own signup creates that row, so the easiest route is to sign up through the deployed site once and confirm the email).
-4. AI consent (important): the backend blocks every call to Gemini for a patient unless `patients.external_ai_consent = true`. With it false, chat, symptom extraction and narratives fall back to local templates. For demo patients with **fictional** data, run in the SQL Editor:
-   ```sql
-   update public.patients set external_ai_consent = true, external_ai_consent_at = now();
-   ```
-   Only do this for fictional patients. Real patient data should never be here.
+4. AI is always on: since 2026-10-24 the backend no longer asks for per-patient consent before calling Gemini (`REQUIRE_PATIENT_CONSENT` defaults to false). Identifier masking (`EXTERNAL_PROCESSING_MODE=redacted`) still applies. Because patient text now always goes to Google, use **fictional patients only**.
 
 ## 2. Backend on Render (10 min)
 1. render.com -> New -> **Blueprint** -> connect the GitHub repo -> branch `phase2/advanced-ml-hardening`. It reads `render.yaml`.
@@ -81,7 +77,7 @@ On Windows PowerShell use `$env:API_BASE="..."` instead of `export`. All lines m
 | Login: 403 "no profile" | the user exists in Auth but has no row in `profiles`. Sign up through the app, or insert the row. |
 | Clinician signup: 403 | missing/wrong invite code, or `CLINICIAN_INVITE_CODE` is not set on Render. |
 | Everything hangs on the first click | free Render instance is waking up (30-60 s). Retry; see step 2.4. |
-| Chat or symptom text looks canned, warning `external_ai_blocked_by_privacy_policy` | patient has no AI consent (step 1.4) or `GEMINI_API_KEY` is wrong. |
+| Chat or symptom text looks canned | `GEMINI_API_KEY` is missing/wrong, quota exhausted, or `REQUIRE_PATIENT_CONSENT=true` was set on the host. Check the Render log. |
 | `ML Lab` returns 503 | model artifact integrity check failed; check the Render log for `MANIFEST`. |
 | Render deploy fails at build | open the build log; the usual cause is a wrong Dockerfile path: it must be `./backend/Dockerfile` with context `./backend`. |
 
