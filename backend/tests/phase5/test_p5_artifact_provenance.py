@@ -65,7 +65,9 @@ def test_units_are_taken_only_from_feature_names_and_never_guessed():
 
 # ---------------------------------------------------------------------------------------------- the validator
 def _complete():
-    return AC.build_training_provenance(
+    import tempfile
+    vr = _validation_run(Path(tempfile.mkdtemp()), kind="risk")
+    return AC.build_training_provenance(validation_run_dir=vr, 
         kind="risk", stem="m", model_version="1.0.0", features=["a", "b"], dataset_info={"sha256": "x" * 64, "n_rows": 10, "n_subjects": 3},
         manifest_status={"status": "PINNED_MATCH"}, protocol_version="p4a-1", seed=1, training_date="2026-01-01T00:00:00Z",
         X=pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 5.0]}), validation_pointer="results/x.json", threshold=0.5, threshold_rationale="fixed a priori",
@@ -100,26 +102,69 @@ def test_missing_sidecar_is_reported_invalid_not_raised(tmp_path):
 
 
 # ---------------------------------------------------------------------------------------------- newly trained artifacts (E05)
-def _train(tmp_path, cands, seed=1):
+def _validation_run(tmp_path, status="completed", kind="disease"):
+    """A hand-made stand-in for a workflow run directory (synthetic; the real one needs the real data)."""
+    d = tmp_path / "vrun"
+    d.mkdir()
+    (d / "experiment_manifest.json").write_text(json.dumps({"protocol_id": "p4a-1", "protocol_sha256": "a" * 64, "seeds": [1],
+                                                           "experiments": {kind: {"status": status, "evidence_status": "SYNTHETIC_FIXTURE_NOT_EVIDENCE"}}}))
+    (d / f"{kind}_fold_assignments.json").write_text("[]")
+    (d / f"{kind}_p4a.json").write_text("{}")
+    return d
+
+
+def _train(tmp_path, cands, seed=1, validation_run_dir=None):
     csv = forged_disease_csv(tmp_path / "parkinsons.data", seed=11)
     df, info = D.load_disease(csv)
     out = tmp_path / "v2"
     meta = TF.train("parkinsons_demo_classifier", "voice", df[D.DISEASE_FEATURES], df["status"], df["subject"], cands,
                     dataset_info=info, out_dir=out, seed=seed, inner_k=3, results_pointer="ml/validation/results/phase4a/disease_p4a.json",
-                    manifest_status={"status": "UNPINNED"})
+                    manifest_status={"status": "UNPINNED"}, validation_run_dir=validation_run_dir)
     jl = out / "parkinsons_demo_classifier.joblib"
     (out / "MANIFEST.json").write_text(json.dumps({"sha256": {jl.name: hashlib.sha256(jl.read_bytes()).hexdigest()}}))
     return csv, out, meta
 
 
 def test_new_artifact_carries_a_complete_provenance_record(tmp_path):
-    csv, out, meta = _train(tmp_path, {"LR": C._lr(1.0)})
+    # contract 1.1.0 also requires the validation run to be linked (split identifiers, performance pointer); see the two tests below
+    csv, out, meta = _train(tmp_path, {"LR": C._lr(1.0)}, validation_run_dir=_validation_run(tmp_path))
     prov = json.loads((out / "parkinsons_demo_classifier_provenance.json").read_text())
     assert AC.validate_provenance(prov)["status"] == AC.COMPLETE and meta["provenance_status"] == AC.COMPLETE
     assert prov["dataset_manifest"]["dataset_sha256"] == D.sha256_file(csv)
     assert prov["protocol_version"] == "p4a-1" and prov["random_seeds"] == {"training_seed": 1}
     assert prov["artifact_checksum"]["sha256"] == hashlib.sha256((out / "parkinsons_demo_classifier.joblib").read_bytes()).hexdigest()
     assert prov["calibration"]["calibrated"] is False and prov["decision_threshold"]["value"] == 0.5
+
+
+def test_new_artifact_without_a_linked_validation_run_is_incomplete_and_says_which_fields(tmp_path):
+    csv, out, meta = _train(tmp_path, {"LR": C._lr(1.0)})
+    prov = json.loads((out / "parkinsons_demo_classifier_provenance.json").read_text())
+    rep = AC.validate_provenance(prov)
+    assert rep["status"] == AC.INCOMPLETE_DECLARED and set(rep["unrecoverable"]) == {"split_identifiers", "performance"}
+    assert prov["split_identifiers"] is None and prov["performance"] is None
+
+
+def test_a_validation_run_that_did_not_complete_is_not_linked(tmp_path):
+    csv, out, meta = _train(tmp_path, {"LR": C._lr(1.0)}, validation_run_dir=_validation_run(tmp_path, status="not_run"))
+    prov = json.loads((out / "parkinsons_demo_classifier_provenance.json").read_text())
+    assert AC.validate_provenance(prov)["status"] == AC.INCOMPLETE_DECLARED and "not_run" in prov["unrecoverable"]["performance"]
+
+
+def test_linked_validation_run_is_pinned_by_sha256_and_carries_its_evidence_label(tmp_path):
+    vr = _validation_run(tmp_path)
+    csv, out, meta = _train(tmp_path, {"LR": C._lr(1.0)}, validation_run_dir=vr)
+    prov = json.loads((out / "parkinsons_demo_classifier_provenance.json").read_text())
+    assert prov["split_identifiers"]["sha256"] == hashlib.sha256((vr / "disease_fold_assignments.json").read_bytes()).hexdigest()
+    assert prov["performance"]["results_sha256"] == hashlib.sha256((vr / "disease_p4a.json").read_bytes()).hexdigest()
+    assert prov["performance"]["evidence_status"] == "SYNTHETIC_FIXTURE_NOT_EVIDENCE" and prov["performance"]["status"] == "EVALUATED_BY_REGISTERED_RUN"
+    assert prov["intended_use"]["clinical_use_permitted"] is False and prov["intended_use"]["status"] == "RESEARCH_DEMONSTRATION"
+
+
+def test_every_record_states_it_is_a_research_demonstration(tmp_path):
+    for kind in ("disease", "risk"):
+        prov = AC.legacy_provenance(kind)
+        assert prov["intended_use"]["clinical_use_permitted"] is False and prov["contract_version"] == "1.1.0"
+        assert prov["performance"]["status"] == "HISTORICAL_UNVERIFIED_NOT_REPRODUCED" and prov["performance"]["uncertainty"] is None
 
 
 def test_E05_retrained_pipelines_name_their_steps_differently_and_must_still_authenticate(tmp_path):

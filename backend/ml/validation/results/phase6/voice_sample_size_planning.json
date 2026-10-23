@@ -1,0 +1,86 @@
+{
+  "task": "voice_sample_size_planning",
+  "status": "completed",
+  "evidence_status": "DESIGN_STAGE_PLANNING_NOT_EVIDENCE",
+  "clinically_validated": false,
+  "protocol_id": "p4a-1",
+  "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+  "simulation": {
+    "design": {
+      "outer": 5,
+      "inner": 3,
+      "n_boot": 150,
+      "candidates": "LR_C0.1, LR_C1",
+      "single_reference": "TIME_BASELINE only (the registered rule also needs TIME_BASELINE_DEMOGRAPHIC and every seed)"
+    },
+    "rows": [
+      {
+        "voice_signal_generator_units": 0.5,
+        "patients": 42,
+        "sessions_per_patient": 139,
+        "reps": 12,
+        "mean_auc_difference_full_minus_time_baseline": 0.02957039754600908,
+        "sd_auc_difference": 0.030510069671767677,
+        "detection_rate_interval_above_0": 0.3333333333333333,
+        "seconds": 34.2
+      },
+      {
+        "voice_signal_generator_units": 0.5,
+        "patients": 84,
+        "sessions_per_patient": 139,
+        "reps": 12,
+        "mean_auc_difference_full_minus_time_baseline": 0.030761765996093676,
+        "sd_auc_difference": 0.015140023921711473,
+        "detection_rate_interval_above_0": 0.5833333333333334,
+        "seconds": 56.9
+      },
+      {
+        "voice_signal_generator_units": 0.5,
+        "patients": 168,
+        "sessions_per_patient": 139,
+        "reps": 12,
+        "mean_auc_difference_full_minus_time_baseline": 0.03119704670638082,
+        "sd_auc_difference": 0.010164283891536549,
+        "detection_rate_interval_above_0": 1.0,
+        "seconds": 89.9
+      },
+      {
+        "voice_signal_generator_units": 1.0,
+        "patients": 42,
+        "sessions_per_patient": 139,
+        "reps": 12,
+        "mean_auc_difference_full_minus_time_baseline": 0.08989730847444453,
+        "sd_auc_difference": 0.04052276780673622,
+        "detection_rate_interval_above_0": 0.8333333333333334,
+        "seconds": 58.3
+      },
+      {
+        "voice_signal_generator_units": 1.0,
+        "patients": 84,
+        "sessions_per_patient": 139,
+        "reps": 12,
+        "mean_auc_difference_full_minus_time_baseline": 0.07932251062813069,
+        "sd_auc_difference": 0.017449464171258665,
+        "detection_rate_interval_above_0": 1.0,
+        "seconds": 85.1
+      },
+      {
+        "voice_signal_generator_units": 1.0,
+        "patients": 168,
+        "sessions_per_patient": 139,
+        "reps": 12,
+        "mean_auc_difference_full_minus_time_baseline": 0.09304165900343793,
+        "sd_auc_difference": 0.013759545419156062,
+        "detection_rate_interval_above_0": 1.0,
+        "seconds": 122.9
+      }
+    ],
+    "caveats": [
+      "power under the registered intersection rule (two references x five seeds) is LOWER than shown",
+      "the generated voice signal is independent across sessions within a patient given the label trend; real voice is autocorrelated",
+      "12 repetitions per cell: detection rates carry roughly +/-28 points of Monte-Carlo error",
+      "the transferable quantity is the AUC difference; the generator unit is arbitrary",
+      "an effect smaller than the smallest simulated one needs more patients than the largest cell here: extrapolation is not supported"
+    ]
+  }
+}

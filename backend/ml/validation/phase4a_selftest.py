@@ -16,7 +16,6 @@ Run:  python -m ml.validation.phase4a selftest
 """
 from __future__ import annotations
 
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -28,10 +27,10 @@ from sklearn.preprocessing import StandardScaler
 
 from ml.evalkit import (auc_stat, group_label_permutation_test, leave_one_group_out, nested_group_cv,
                         paired_cluster_bootstrap_diff)
+from ml.evalkit.warnings_util import quiet
 from ml.validation import candidates as C
 from ml.validation import data as D
 
-warnings.filterwarnings("ignore")
 
 
 def lr_cands() -> dict:
@@ -80,6 +79,7 @@ def risk_rep(seed: int, voice_signal: float, n_boot: int, synth) -> dict:
     return {"diff": ci["point"], "lo": ci.get("lo"), "hi": ci.get("hi")}
 
 
+@quiet
 def run_selftest(reps: int = 24, n_perm: int = 40, n_boot: int = 200, seed0: int = 4_000, scenarios=("A", "B", "B2", "C", "D")) -> dict:
     from ml.validation import phase4a as P
     from ml.validation.phase4a import synthetic_disease, synthetic_risk

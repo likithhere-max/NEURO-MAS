@@ -1,5 +1,5 @@
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "model_id": "parkinsons_demo_classifier",
   "model_version": "legacy-unversioned",
   "dataset_manifest": {
@@ -238,6 +238,18 @@
     "sha256": "048678799e7bbe4e2d4d4b4113eb01b6c1029fd80460f20b2fab23b59cc1cd04",
     "verified_against_manifest": true
   },
+  "intended_use": {
+    "status": "RESEARCH_DEMONSTRATION",
+    "clinical_use_permitted": false,
+    "statement": "Research demonstration on a small public dataset. Not clinically validated; not for diagnosis, monitoring or any decision about a patient.",
+    "document": "docs/phase6/CLINICAL_INTENDED_USE.md"
+  },
+  "split_identifiers": null,
+  "performance": {
+    "status": "HISTORICAL_UNVERIFIED_NOT_REPRODUCED",
+    "uncertainty": null,
+    "source": "metadata key loso_metrics (see validation_pointer)"
+  },
   "training_script_superseded": "ml/training/train_parkinsons_classifier.py",
   "artifact_first_committed_in": "156207c8b8d21830b95bae4c368a74646c42f89e",
   "unrecoverable": {
@@ -245,6 +257,8 @@
     "protocol_version": "the artifact predates the registered protocols",
     "training_code_revision": "no git revision was recorded at training time (artifact_first_committed_in is the commit that added the file, not necessarily the training revision)",
     "training_date": "not recorded in the artifact or its metadata",
-    "decision_threshold.rationale": "not recorded"
+    "decision_threshold.rationale": "not recorded",
+    "split_identifiers": "no fold assignment was saved; the splitters (LeaveOneGroupOut / GroupKFold) are deterministic but the file they split is unpinned",
+    "performance": "historical figures only, with no interval and selected on the scoring folds; the registered re-evaluation is NOT_RUN"
   }
 }

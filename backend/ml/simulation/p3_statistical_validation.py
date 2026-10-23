@@ -27,7 +27,6 @@ from pathlib import Path
 
 import numpy as np
 
-warnings.filterwarnings("ignore")
 SEED = 20261024
 
 
@@ -322,6 +321,9 @@ def s8_risk_enumeration() -> dict:
 
 
 def main():
+    import warnings as _w
+    _w.simplefilter("ignore")   # scoped to this script's own run
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
     ap.add_argument("--scale", type=float, default=1.0, help="multiply all repetition counts (use 0.1 for a smoke run)")

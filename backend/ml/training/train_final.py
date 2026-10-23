@@ -52,7 +52,8 @@ def _git_commit() -> str | None:
 
 def train(stem: str, kind: str, X: pd.DataFrame, y: pd.Series, groups: pd.Series, cands: dict, *, dataset_info: dict,
           out_dir: Path, seed: int, inner_k: int = 5, results_pointer: str | None = None,
-          manifest_status: dict | None = None, model_version: str = "2.0.0-candidate", protocol_version: str | None = None) -> dict:
+          manifest_status: dict | None = None, model_version: str = "2.0.0-candidate", protocol_version: str | None = None,
+          validation_run_dir: Path | None = None) -> dict:
     import sklearn
     X, y, g = X.reset_index(drop=True), y.reset_index(drop=True), pd.Series(np.asarray(groups)).reset_index(drop=True)
     name, scores, _, status = inner_select(cands, X, y, g, inner_k=inner_k, seed=seed)
@@ -85,7 +86,8 @@ def train(stem: str, kind: str, X: pd.DataFrame, y: pd.Series, groups: pd.Series
         training_date=dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), X=X,
         validation_pointer=results_pointer or "NONE_LINKED", threshold=0.5,
         threshold_rationale="fixed a priori at 0.5 by the registered protocol; not tuned on any data",
-        artifact_sha256=hashlib.sha256(jl.read_bytes()).hexdigest(), code_revision=_git_commit())
+        artifact_sha256=hashlib.sha256(jl.read_bytes()).hexdigest(), code_revision=_git_commit(),
+        validation_run_dir=validation_run_dir)
     (out_dir / f"{stem}_provenance.json").write_text(json.dumps(prov, indent=2, default=str) + "\n")
     meta["provenance_status"] = AC.validate_provenance(prov)["status"]
     return meta
@@ -98,20 +100,23 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", type=int, default=20261023)
     ap.add_argument("--out-dir", default=str(MODELS / "v2"))
     ap.add_argument("--fast", action="store_true")
+    ap.add_argument("--validation-run", help="directory of a COMPLETED ml.validation.workflow run for this task; linked (by SHA-256) in the provenance record. "
+                                             "Without it the record is INCOMPLETE_DECLARED: it cannot say how the model was evaluated.")
     a = ap.parse_args(argv)
+    vrun = Path(a.validation_run) if a.validation_run else None
     if a.which == "disease":
         path = Path(a.csv) if a.csv else D.fetch("parkinsons")
         df, info = D.load_disease(path)
         meta = train("parkinsons_demo_classifier", "voice", df[D.DISEASE_FEATURES], df["status"], df["subject"],
                      C.disease_candidates(a.fast), dataset_info=info, out_dir=Path(a.out_dir), seed=a.seed,
-                     results_pointer="ml/validation/results/disease.json", manifest_status=DM.verify_file("parkinsons", path))
+                     results_pointer="ml/validation/results/disease.json", manifest_status=DM.verify_file("parkinsons", path), validation_run_dir=vrun)
     else:
         path = Path(a.csv) if a.csv else D.fetch("parkinsons_updrs")
         df, dcols, info = D.load_risk(path)
         cols = dcols + ["test_time", "baseline_total_UPDRS"]
         meta = train("parkinsons_risk_classifier", "risk", df[cols], df["worsening"], df["subject#"].astype(str),
                      C.risk_candidates(a.fast), dataset_info=info, out_dir=Path(a.out_dir), seed=a.seed,
-                     results_pointer="ml/validation/results/risk.json", manifest_status=DM.verify_file("parkinsons_updrs", path))
+                     results_pointer="ml/validation/results/risk.json", manifest_status=DM.verify_file("parkinsons_updrs", path), validation_run_dir=vrun)
     print(json.dumps({k: meta[k] for k in ("model", "selection", "sklearn_version")}, indent=2))
     print("Next: python -m ml.validation.validate_models manifest   (after copying artifacts into ml/models/ deliberately)")
     return 0

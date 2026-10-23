@@ -35,6 +35,7 @@ from ml.validation import dataset_manifest as DM
 from ml.validation import exclusions as E
 from ml.validation import fingerprint as F
 from ml.validation import phase4a as P
+from ml.validation import phase6 as PH6
 from ml.validation import report_from_artifacts as R
 
 WORKFLOW_VERSION = "1.0.0"
@@ -94,7 +95,7 @@ class Recorder:
                            "folds": [{"fold": f.fold, "test_groups": [str(x) for x in f.test_groups], "n_train": f.n_train, "n_test": f.n_test,
                                       "chosen": f.chosen, "selection_status": f.selection_status} for f in res.folds]})
 
-    def save(self, out: Path, kind: str) -> list[Path]:
+    def save(self, out: Path, kind: str, prefix: str = "") -> list[Path]:
         prot = out / "protected"
         prot.mkdir(parents=True, exist_ok=True)
         (prot / ".gitignore").write_text("*\n!.gitignore\n!README.md\n")
@@ -103,11 +104,11 @@ class Recorder:
         paths = []
         rows = [r for r in self.rows if (r["kind"] == kind).all()]
         if rows:
-            p = prot / f"{kind}_heldout_predictions.csv"
+            p = prot / f"{prefix}{kind}_heldout_predictions.csv"
             pd.concat(rows).to_csv(p, index=False)
             os.chmod(p, 0o600)
             paths.append(p)
-        pf = out / f"{kind}_fold_assignments.json"
+        pf = out / f"{prefix}{kind}_fold_assignments.json"
         pf.write_text(json.dumps([f for f in self.folds if f["kind"] == kind], indent=1) + "\n")
         return paths + [pf]
 
@@ -118,10 +119,12 @@ def _write(out: Path, name: str, payload: dict) -> Path:
     return p
 
 
-def _experiment(kind: str, csv: str | None, out: Path, *, seeds, n_boot, n_perm, fast, models_dir, manifest_path) -> dict:
+def _experiment(kind: str, csv: str | None, out: Path, *, seeds, n_boot, n_perm, fast, models_dir, manifest_path, candidate_set: str = "p4a-1") -> dict:
     """Never raises. Returns {status, exit, reason, ...}."""
     rec = {"kind": kind, "status": None, "reason": None, "outputs": []}
-    for stale in (f"{kind}_p4a.json", f"{kind}_NOT_RUN.json", f"{kind}_FAILED.json"):          # a new run must not leave an old verdict behind
+    ext = candidate_set == PH6.EXT_ID
+    result_name = f"{kind}_p6ext.json" if ext else f"{kind}_p4a.json"
+    for stale in (result_name, f"{kind}_NOT_RUN.json", f"{kind}_FAILED.json"):          # a new run must not leave an old verdict behind
         (out / stale).unlink(missing_ok=True)
     try:
         try:
@@ -155,13 +158,21 @@ def _experiment(kind: str, csv: str | None, out: Path, *, seeds, n_boot, n_perm,
         t0 = time.time()
         if kind == "disease":
             df, info = loaded
-            res = P.run_disease(df, {**info, "path": path.name}, seeds=seeds, n_boot=n_boot, n_perm=n_perm, fast=fast, evidence=evidence, recorder=recorder)
+            if ext:
+                res = PH6.run_disease_extension(df, {**info, "path": path.name}, seeds=seeds, fast=fast, evidence=evidence, recorder=recorder)
+            else:
+                res = P.run_disease(df, {**info, "path": path.name}, seeds=seeds, n_boot=n_boot, n_perm=n_perm, fast=fast, evidence=evidence, recorder=recorder)
         else:
             df, dcols, info = loaded
-            res = P.run_risk(df, dcols, {**info, "path": path.name}, seeds=seeds, n_boot=n_boot, fast=fast, evidence=evidence, recorder=recorder)
+            if ext:
+                res = PH6.run_risk_extension(df, dcols, {**info, "path": path.name}, seeds=seeds, fast=fast, evidence=evidence, recorder=recorder)
+            else:
+                res = P.run_risk(df, dcols, {**info, "path": path.name}, seeds=seeds, n_boot=n_boot, fast=fast, evidence=evidence, recorder=recorder)
+        if ext:
+            evidence = res["evidence_status"]
         res = {**res, "authentication": auth, "manifest_check": man, "data_quality": dq}
-        rec["outputs"].append(str(_write(out, f"{kind}_p4a.json", res)))
-        rec["outputs"] += [str(x) for x in recorder.save(out, kind)]
+        rec["outputs"].append(str(_write(out, result_name, res)))
+        rec["outputs"] += [str(x) for x in recorder.save(out, kind, "p6ext_" if ext else "")]
         rec.update(status=COMPLETED, exit=0, seconds=round(time.time() - t0, 1), evidence_status=evidence)
         return rec
     except Exception as e:  # noqa: BLE001 - a crash is a reported FAILED, never a partial success
@@ -172,21 +183,35 @@ def _experiment(kind: str, csv: str | None, out: Path, *, seeds, n_boot, n_perm,
 
 def run_workflow(*, disease_csv: str | None = None, risk_csv: str | None = None, out_dir: Path = DEFAULT_OUT, seeds: list[int] | None = None,
                  n_boot: int = P.PROTOCOL["n_boot"], n_perm: int = P.PROTOCOL["n_perm"], fast: bool = False,
-                 models_dir: Path = F.MODELS, manifest_path: Path = DM.MANIFEST, argv: list[str] | None = None) -> tuple[int, dict]:
+                 models_dir: Path = F.MODELS, manifest_path: Path = DM.MANIFEST, argv: list[str] | None = None,
+                 candidate_set: str = "p4a-1") -> tuple[int, dict]:
+    if candidate_set not in ("p4a-1", PH6.EXT_ID):
+        raise ValueError(f"unknown candidate set {candidate_set!r}")
     out = Path(out_dir)
+    prior = out / "experiment_manifest.json"
+    if prior.exists():
+        try:
+            prior_set = json.loads(prior.read_text()).get("candidate_set", "p4a-1")
+        except Exception:  # noqa: BLE001
+            prior_set = None
+        if prior_set is not None and prior_set != candidate_set:
+            raise ValueError(f"{out} already holds a {prior_set!r} run; use a separate --out directory for {candidate_set!r} so neither manifest is overwritten")
     out.mkdir(parents=True, exist_ok=True)
     seeds = seeds or [P.PROTOCOL["seed_base"] + i for i in range(P.PROTOCOL["default_seeds"])]
-    exps = {k: _experiment(k, c, out, seeds=seeds, n_boot=n_boot, n_perm=n_perm, fast=fast, models_dir=models_dir, manifest_path=manifest_path)
+    exps = {k: _experiment(k, c, out, seeds=seeds, n_boot=n_boot, n_perm=n_perm, fast=fast, models_dir=models_dir, manifest_path=manifest_path, candidate_set=candidate_set)
             for k, c in (("disease", disease_csv), ("risk", risk_csv))}
     st = {e["status"] for e in exps.values()}
     overall = (COMPLETED if st == {COMPLETED} else FAILED if FAILED in st else REFUSED if REFUSED in st else NOT_RUN if st == {NOT_RUN} else "INCOMPLETE")
     code = {COMPLETED: 0, FAILED: 1, REFUSED: 3}.get(overall, 2)
     manifest = {"manifest_schema": "neuro-mas-experiment-manifest/1", **run_context(argv or [], out_dir), "seeds": seeds, "n_boot": n_boot, "n_perm": n_perm,
-                "fast": fast, "overall_status": overall, "exit_code": code, "experiments": exps,
+                "fast": fast, "candidate_set": candidate_set, "overall_status": overall, "exit_code": code, "experiments": exps,
+                **({"extension_protocol_id": PH6.PROTOCOL_P6["id"], "extension_protocol_sha256": PH6.PROTOCOL_P6_SHA256,
+                    "extension_note": "EXPLORATORY extension of p4a-1; not the registered confirmatory analysis"} if candidate_set == PH6.EXT_ID else {}),
                 "dataset_manifest": DM.load_manifest(manifest_path)["overall_status"], "clinically_validated": False}
     report_note = None
     try:                                                                                  # the report is generated from, and checked against, the JSON
-        report_note = len(R.write_report(out, out / "GENERATED_RESULTS.md"))
+        if candidate_set == "p4a-1":                                                     # the extension's report is ml.validation.phase6_report
+            report_note = len(R.write_report(out, out / "GENERATED_RESULTS.md"))
     except Exception as e:  # noqa: BLE001
         manifest["report_error"] = f"{type(e).__name__}: {e}"
         manifest["overall_status"], manifest["exit_code"], code = FAILED, 1, 1
@@ -206,6 +231,8 @@ def main(argv=None) -> int:
     ap.add_argument("--n-boot", type=int, default=P.PROTOCOL["n_boot"])
     ap.add_argument("--n-perm", type=int, default=P.PROTOCOL["n_perm"])
     ap.add_argument("--fast", action="store_true", help="smoke test only; NOT the registered protocol")
+    ap.add_argument("--candidate-set", choices=["p4a-1", PH6.EXT_ID], default="p4a-1",
+                    help="p4a-1 = the registered analysis (default); p6-1-ext = prespecified EXPLORATORY extension families, same folds")
     a = ap.parse_args(argv)
     out = Path(a.out)
     if a.cmd == "report":
@@ -214,7 +241,7 @@ def main(argv=None) -> int:
         return 0
     seeds = [P.PROTOCOL["seed_base"] + i for i in range(a.seeds)]
     code, m = run_workflow(disease_csv=a.disease_csv, risk_csv=a.risk_csv, out_dir=out, seeds=seeds, n_boot=a.n_boot, n_perm=a.n_perm, fast=a.fast,
-                           argv=list(sys.argv))
+                           argv=list(sys.argv), candidate_set=a.candidate_set)
     for k, e in m["experiments"].items():
         print(f"{k:8s} {e['status'].upper():10s} {e.get('reason') or ''}", file=sys.stderr if code else sys.stdout)
     print(f"overall: {m['overall_status'].upper()} (exit {code})", file=sys.stderr if code else sys.stdout)

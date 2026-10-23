@@ -30,7 +30,6 @@ import platform
 import sys
 import time
 import traceback
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -41,13 +40,13 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from ml.evalkit import (aggregate_by_group, auc_stat, cluster_bootstrap, evaluate_binary, group_label_permutation_test,
                         leave_one_group_out, nested_group_cv, paired_cluster_bootstrap_diff, ppv_npv_at_prevalence,
                         reliability_table, wilson_interval)
+from ml.evalkit.warnings_util import record_warnings
 from ml.validation import candidates as C
 from ml.validation import data as D
 from ml.validation import fingerprint as F
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results" / "phase4a"
-warnings.filterwarnings("ignore")
 
 # ------------------------------------------------------------------------------------------------ frozen protocol
 PROTOCOL = {
@@ -304,6 +303,7 @@ def noskill_metrics(y, oof, thr: float) -> dict:
 
 
 # ------------------------------------------------------------------------------------------------ the two protocols
+@record_warnings
 def run_risk(df: pd.DataFrame, delta_cols: list[str], info: dict, *, seeds: list[int], n_boot: int, fast: bool, evidence: str,
              recorder=None) -> dict:
     """`recorder(tag, seed, y, groups, nested_result)` is called after every nested fit (fold assignments / held-out predictions can be saved);
@@ -383,6 +383,7 @@ def run_risk(df: pd.DataFrame, delta_cols: list[str], info: dict, *, seeds: list
         runtime_seconds=round(time.time() - t0, 1))
 
 
+@record_warnings
 def run_disease(df: pd.DataFrame, info: dict, *, seeds: list[int], n_boot: int, n_perm: int, fast: bool, evidence: str,
                 recorder=None) -> dict:
     t0 = time.time()

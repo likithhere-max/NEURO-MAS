@@ -38,7 +38,6 @@ HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
 MODELS = HERE.parent / "models"
 PREVALENCES = (0.005, 0.01, 0.05, 0.2, 0.75)
-warnings.filterwarnings("ignore")
 
 
 def env_info() -> dict:
@@ -233,6 +232,10 @@ def run_artifacts() -> dict:
 
 
 # ----------------------------------------------------------------------------- CLI
+from ml.evalkit.warnings_util import quiet  # noqa: E402
+
+
+@quiet
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["fetch", "disease", "risk", "artifacts", "manifest", "synthetic-smoke"])

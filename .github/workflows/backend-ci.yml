@@ -1,0 +1,84 @@
+# Backend CI.  Written in Phase 6 and NOT yet executed on GitHub (pushes from the authoring environment were blocked); every command in it
+# was run locally from backend/.  First run on GitHub is the real test of this file.
+name: backend-ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      require_real_data:
+        description: "Fail the run if real-data validation is NOT_RUN (needs the UCI files; see docs/phase5/REPRODUCIBILITY.md)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock.txt
+      - name: Install pinned dependencies
+        run: pip install -r requirements.lock.txt
+      - name: Test suite (live-service tests skip by design; no test depends on the real UCI data)
+        run: python -m pytest -q -p no:cacheprovider -rs
+
+  real-data-validation:
+    # This job exists so that the absence of real-data validation is VISIBLE, not silently green.
+    #  exit 0 = completed, 2 = NOT_RUN or incomplete (data unavailable), 3 = refused (file does not authenticate), 1 = failed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: tests
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      REQUIRE_REAL_DATA: ${{ inputs.require_real_data && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock.txt
+      - run: pip install -r requirements.lock.txt
+      - name: Dataset manifest status (exit 2 while unpinned)
+        run: PYTHONPATH=. python -m ml.validation.dataset_manifest status || true
+      - name: Registered validation workflow
+        id: wf
+        run: |
+          set +e
+          PYTHONPATH=. python -m ml.validation.workflow run --out ../ci_validation_out
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          case "$code" in
+            0) echo "### Real-data validation: COMPLETED" >> "$GITHUB_STEP_SUMMARY" ;;
+            2) echo "### Real-data validation: NOT_RUN (data unavailable). No performance claim is supported by this run." >> "$GITHUB_STEP_SUMMARY"
+               echo "::warning title=Real-data validation NOT_RUN::the registered protocol did not run; this is not a pass" ;;
+            3) echo "### Real-data validation: REFUSED (file did not authenticate)" >> "$GITHUB_STEP_SUMMARY" ;;
+            *) echo "### Real-data validation: FAILED" >> "$GITHUB_STEP_SUMMARY" ;;
+          esac
+          if [ "$code" = "0" ]; then exit 0; fi
+          if [ "$code" = "2" ] && [ "$REQUIRE_REAL_DATA" != "true" ]; then exit 0; fi
+          exit "$code"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-manifest
+          path: |
+            ci_validation_out/experiment_manifest.json
+            ci_validation_out/*_NOT_RUN.json
+            ci_validation_out/*.json
+            !ci_validation_out/protected/**

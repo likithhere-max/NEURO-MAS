@@ -93,12 +93,47 @@ def simulate_risk_voice_power(levels=(0.0, 0.25, 0.5, 1.0, 2.0), reps: int = 20,
                         "real power can be lower or higher", f"{reps} repetitions per level: detection rates carry roughly +/-{100 * 0.98 / math.sqrt(reps):.0f} points of Monte-Carlo error"]}
 
 
+def simulate_voice_sample_size(patient_counts=(42, 84, 168), levels=(0.5, 1.0), reps: int = 12, n_boot: int = 150, seed0: int = 31_000) -> dict:
+    """How does the chance that the paired interval of FULL minus TIME_BASELINE excludes 0 grow with the number of PATIENTS, for a fixed
+    generated voice effect?  Sessions per patient are held at 139.  DESIGN-STAGE PLANNING under an invented generator, not evidence."""
+    rows = []
+    for li, lev in enumerate(levels):
+        for ni, n in enumerate(patient_counts):
+            t0 = time.time()
+
+            def synth(seed, voice_signal, _n=n):
+                return P.synthetic_risk(seed, n_patients=_n, visits=139, voice_signal=voice_signal)
+
+            res = [ST.risk_rep(seed0 + 10_000 * li + 1000 * ni + i, lev, n_boot, synth) for i in range(reps)]
+            diffs = [r["diff"] for r in res]
+            pos = [r["lo"] is not None and r["lo"] > 0 for r in res]
+            rows.append({"voice_signal_generator_units": lev, "patients": n, "sessions_per_patient": 139, "reps": reps,
+                         "mean_auc_difference_full_minus_time_baseline": float(np.mean(diffs)), "sd_auc_difference": float(np.std(diffs, ddof=1)),
+                         "detection_rate_interval_above_0": float(np.mean(pos)), "seconds": round(time.time() - t0, 1)})
+    return {"design": {"outer": 5, "inner": 3, "n_boot": n_boot, "candidates": "LR_C0.1, LR_C1", "single_reference": "TIME_BASELINE only (the registered rule also needs TIME_BASELINE_DEMOGRAPHIC and every seed)"},
+            "rows": rows,
+            "caveats": ["power under the registered intersection rule (two references x five seeds) is LOWER than shown",
+                        "the generated voice signal is independent across sessions within a patient given the label trend; real voice is autocorrelated",
+                        f"{reps} repetitions per cell: detection rates carry roughly +/-{100 * 0.98 / math.sqrt(reps):.0f} points of Monte-Carlo error",
+                        "the transferable quantity is the AUC difference; the generator unit is arbitrary",
+                        "an effect smaller than the smallest simulated one needs more patients than the largest cell here: extrapolation is not supported"]}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--reps", type=int, default=20)
     ap.add_argument("--skip-simulation", action="store_true")
+    ap.add_argument("--sample-size", action="store_true", help="run ONLY the patients-vs-detection simulation and write it to --out")
     ap.add_argument("--out", default=str(OUT))
     a = ap.parse_args(argv)
+    if a.sample_size:
+        body = {"task": "voice_sample_size_planning", "status": "completed", "evidence_status": EVIDENCE, "clinically_validated": False,
+                "protocol_id": P.PROTOCOL["id"], "protocol_sha256": P.PROTOCOL_SHA256, "simulation": simulate_voice_sample_size(reps=a.reps)}
+        out = Path(a.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(body, indent=2) + "\n")
+        print(out)
+        return 0
     body = {"task": "power_planning", "status": "completed", "evidence_status": EVIDENCE, "clinically_validated": False,
             "protocol_id": P.PROTOCOL["id"], "protocol_sha256": P.PROTOCOL_SHA256,
             "analytic_disease_precision": analytic_disease_precision(), "prevalence_sensitivity": prevalence_sensitivity(),

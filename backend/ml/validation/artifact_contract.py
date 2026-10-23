@@ -20,13 +20,14 @@ from pathlib import Path
 from app.ml import contract as K
 from ml.validation import fingerprint as F
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"      # 1.1.0 (Phase 6): + intended_use, split_identifiers, performance
 MODELS = F.MODELS
 
 REQUIRED_FIELDS = (
     "model_id", "model_version", "dataset_manifest", "protocol_version", "training_code_revision", "runtime_versions",
     "feature_schema", "feature_units", "preprocessing", "target_definition", "prediction_horizon", "training_date", "random_seeds",
     "validation_pointer", "calibration", "decision_threshold", "known_limitations", "artifact_checksum",
+    "intended_use", "split_identifiers", "performance",
 )
 COMPLETE, INCOMPLETE_DECLARED, INVALID = "COMPLETE", "INCOMPLETE_DECLARED", "INVALID"
 
@@ -76,10 +77,58 @@ def training_matrix_moments(X) -> dict:
     return {"n_samples_seen": int(len(a)), "mean": a.mean(axis=0).tolist(), "scale": a.std(axis=0, ddof=0).tolist()}
 
 
+INTENDED_USE_DOC = "docs/phase6/CLINICAL_INTENDED_USE.md"
+
+
+def intended_use() -> dict:
+    """Same for every artifact today: both models are research demonstrations.  A change of status needs the clinical decisions listed in
+    CLINICAL_INTENDED_USE.md and is never made by editing this function alone."""
+    return {"status": "RESEARCH_DEMONSTRATION", "clinical_use_permitted": False, "statement": K.DEMO_ONLY_LIMITATION, "document": INTENDED_USE_DOC}
+
+
+def _sha_file(p: Path) -> str:
+    import hashlib
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+
+def validation_link(run_dir: Path | None, kind: str) -> tuple[dict | None, dict | None, dict]:
+    """(split_identifiers, performance, unrecoverable) for an artifact whose registered validation run is in `run_dir`.
+    Linked only if that run's experiment for `kind` is `completed`; otherwise the fields are declared unrecoverable with the reason.
+    Metrics are not copied: the record points at the results file and pins it by SHA-256."""
+    why = {}
+    if run_dir is None:
+        why = {"split_identifiers": "no validation run was supplied at training time", "performance": "no validation run was supplied at training time"}
+        return None, None, why
+    run_dir = Path(run_dir)
+    mp = run_dir / "experiment_manifest.json"
+    if not mp.exists():
+        r = f"{run_dir} has no experiment_manifest.json"
+        return None, None, {"split_identifiers": r, "performance": r}
+    man = json.loads(mp.read_text())
+    exp = man.get("experiments", {}).get(kind)
+    if not exp or exp.get("status") != "completed":
+        r = f"the {kind} validation experiment in {run_dir} is {exp.get('status') if exp else 'absent'}; nothing to link"
+        return None, None, {"split_identifiers": r, "performance": r}
+    folds = run_dir / f"{kind}_fold_assignments.json"
+    res = next((run_dir / n for n in (f"{kind}_p4a.json", f"{kind}_p6ext.json") if (run_dir / n).exists()), None)
+    split = ({"fold_assignments_file": folds.name, "sha256": _sha_file(folds), "protocol_id": man.get("protocol_id"), "protocol_sha256": man.get("protocol_sha256"),
+              "seeds": man.get("seeds")} if folds.exists() else None)
+    perf = ({"status": "EVALUATED_BY_REGISTERED_RUN", "results_file": res.name, "results_sha256": _sha_file(res), "experiment_manifest_sha256": _sha_file(mp),
+             "evidence_status": exp.get("evidence_status"), "uncertainty": "cluster bootstrap intervals are inside the results file"} if res else None)
+    unrec = {}
+    if split is None:
+        unrec["split_identifiers"] = "fold assignment file missing from the validation run"
+    if perf is None:
+        unrec["performance"] = "results file missing from the validation run"
+    return split, perf, unrec
+
+
 def build_training_provenance(*, kind: str, stem: str, model_version: str, features: list[str], dataset_info: dict, manifest_status: dict,
                               protocol_version: str, seed: int, training_date: str, X, validation_pointer: str,
-                              threshold: float, threshold_rationale: str, artifact_sha256: str, code_revision: str | None) -> dict:
+                              threshold: float, threshold_rationale: str, artifact_sha256: str, code_revision: str | None,
+                              validation_run_dir: Path | None = None) -> dict:
     tgt, hor = _task_text(kind)
+    split, perf, unrec = validation_link(validation_run_dir, kind)
     return {
         "contract_version": CONTRACT_VERSION, "model_id": stem, "model_version": model_version,
         "dataset_manifest": {"dataset_sha256": dataset_info.get("sha256"), "manifest_status": manifest_status,
@@ -95,7 +144,8 @@ def build_training_provenance(*, kind: str, stem: str, model_version: str, featu
         "decision_threshold": {"value": threshold, "rationale": threshold_rationale},
         "known_limitations": [K.DEMO_ONLY_LIMITATION, "No external validation. Small number of independent subjects.",
                               "Scores are uncalibrated."] + ([K.TEST_TIME_MISMATCH_NOTE] if kind == "risk" else []),
-        "artifact_checksum": {"file": f"{stem}.joblib", "sha256": artifact_sha256}, "unrecoverable": {},
+        "artifact_checksum": {"file": f"{stem}.joblib", "sha256": artifact_sha256},
+        "intended_use": intended_use(), "split_identifiers": split, "performance": perf, "unrecoverable": unrec,
     }
 
 
@@ -134,6 +184,10 @@ def legacy_provenance(kind: str, models_dir: Path = MODELS) -> dict:
                               "Model selection used the same folds that produced the reported score (optimistic)."]
                              + ([K.TEST_TIME_MISMATCH_NOTE] if kind == "risk" else []),
         "artifact_checksum": {"file": f"{stem}.joblib", "sha256": man["sha256"][f"{stem}.joblib"], "verified_against_manifest": True},
+        "intended_use": intended_use(),
+        "split_identifiers": None,
+        "performance": {"status": "HISTORICAL_UNVERIFIED_NOT_REPRODUCED", "uncertainty": None,
+                        "source": "metadata key " + ("loso_metrics" if kind == "disease" else "pooled_metrics") + " (see validation_pointer)"},
         "training_script_superseded": script, "artifact_first_committed_in": added.splitlines()[-1] if added else None,
         "unrecoverable": {
             "dataset_manifest": "the dataset file was never pinned; no SHA-256 of the training data is recorded anywhere",
@@ -141,6 +195,8 @@ def legacy_provenance(kind: str, models_dir: Path = MODELS) -> dict:
             "training_code_revision": "no git revision was recorded at training time (artifact_first_committed_in is the commit that added the file, not necessarily the training revision)",
             "training_date": "not recorded in the artifact or its metadata",
             "decision_threshold.rationale": "not recorded",
+            "split_identifiers": "no fold assignment was saved; the splitters (LeaveOneGroupOut / GroupKFold) are deterministic but the file they split is unpinned",
+            "performance": "historical figures only, with no interval and selected on the scoring folds; the registered re-evaluation is NOT_RUN",
         },
     }
 
