@@ -44,10 +44,14 @@ class ParkinsonsVoiceFeaturesIn(BaseModel):
 
 
 class ParkinsonsPredictionOut(BaseModel):
-    predicted_class: int  # 0 = healthy, 1 = parkinsons (matches training label encoding)
-    predicted_label: str
-    probability_parkinsons: float
-    probability_healthy: float
+    # When `abstained` is true the input was outside the validated domain: NO prediction is made and the
+    # prediction fields are null. (Phase 2, C4: an unreliable number is never returned just to fill the schema.)
+    predicted_class: int | None = None  # 0 = healthy, 1 = parkinsons (matches training label encoding)
+    predicted_label: str | None = None
+    probability_parkinsons: float | None = None
+    probability_healthy: float | None = None
+    abstained: bool = False
+    domain: dict | None = None
     disclaimer: str
 
 
@@ -85,8 +89,10 @@ class ParkinsonsRiskFeaturesIn(BaseModel):
 
 
 class ParkinsonsRiskPredictionOut(BaseModel):
-    predicted_class: int  # 0 = stable/improving, 1 = worsening (matches training label encoding)
-    predicted_label: str
-    probability_worsening: float
-    probability_stable_or_improving: float
+    predicted_class: int | None = None  # 0 = stable/improving, 1 = worsening (matches training label encoding)
+    predicted_label: str | None = None
+    probability_worsening: float | None = None
+    probability_stable_or_improving: float | None = None
+    abstained: bool = False
+    domain: dict | None = None
     disclaimer: str

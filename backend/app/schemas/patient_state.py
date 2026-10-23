@@ -78,6 +78,9 @@ class LongitudinalTrend(BaseModel):
     anomaly_z_score: Optional[float] = None
     is_personal_anomaly: bool = False
     readings_available: int = 0
+    # Full structured longitudinal report (app/ml/longitudinal.AnomalyReport.as_dict()): method/version, baseline,
+    # statistics, thresholds with provenance, signals, data-quality warnings, limitations. None when no readings.
+    anomaly_report: Optional[dict] = None
 
 
 class PatientPreferences(BaseModel):

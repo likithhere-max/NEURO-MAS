@@ -18,6 +18,7 @@ import asyncio
 from pydantic import BaseModel
 
 from app.agents.base import BaseNeuroAgent
+from app.core.evidence import EvidenceType, HypothesisEvidence
 from app.ai.gemini_service import GeminiServiceError, generate_structured
 from app.core.messaging import EvidenceItem
 from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
@@ -161,5 +162,14 @@ class KnowledgeAgent(BaseNeuroAgent):
             recommended_next_agents=[],
             requires_human_review=False,
             reasoning_summary=reasoning_summary,
+            # Context only: these look up the diagnostic agent's own candidates, so they never rank anything.
+            hypothesis_evidence=[
+                HypothesisEvidence(
+                    source_agent=self.name, hypothesis=s["condition"], evidence_type=EvidenceType.KNOWLEDGE_RETRIEVAL,
+                    strength=None, score_kind="citation_availability", independence_group="kb_lookup",
+                    provenance="curated KB lookup of the diagnostic candidate; no passage-level verification",
+                )
+                for s in evidence_summaries
+            ],
             raw_payload={"citations": citations, "narrative_source": narrative_source},
         )

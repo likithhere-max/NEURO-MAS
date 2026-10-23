@@ -23,6 +23,7 @@ import logging
 from pydantic import BaseModel
 
 from app.agents.base import BaseNeuroAgent
+from app.core.evidence import Direction, EvidenceType, HypothesisEvidence
 from app.ai.gemini_service import GeminiServiceError, generate_structured
 from app.core.messaging import EvidenceItem
 from app.rag import knowledge_retriever
@@ -190,6 +191,19 @@ class NeuroDiagnosticAgent(BaseNeuroAgent):
             confidence=round(top_confidence, 2),
             evidence=evidence,
             warnings=warnings,
+            hypothesis_evidence=[
+                HypothesisEvidence(
+                    source_agent=self.name, hypothesis=c["preferred_name"], evidence_type=EvidenceType.DIAGNOSTIC,
+                    direction=Direction.SUPPORTS, strength=float(c.get("confidence", 0.0)),
+                    score_kind="retrieval_confidence_capped",
+                    # lexical and semantic retrieval read the SAME symptom text: one observation, not two
+                    independence_group="symptom_text_retrieval",
+                    provenance=f"{c.get('retrieval_method', 'unknown')}; curated KB; heuristic, not a validated classifier",
+                    validated=False,
+                )
+                for c in candidates[:3]
+            ],
+            agent_version="diagnostic-retrieval-1.0",
             recommended_next_agents=["risk_stratification_agent", "longitudinal_agent"],
             requires_human_review=True,  # diagnostic output ALWAYS requires clinician review
             reasoning_summary=reasoning_summary,

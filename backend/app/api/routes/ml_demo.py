@@ -29,6 +29,7 @@ from app.schemas.ml_demo import (
     ParkinsonsRiskPredictionOut,
     ParkinsonsVoiceFeaturesIn,
 )
+from app.ml.ood import InputDomain
 from app.services.auth import get_current_user
 
 router = APIRouter(prefix="/demo", tags=["ml-demo"])
@@ -78,6 +79,33 @@ def _verified_load(path):
     return joblib.load(path)
 
 
+METRICS_STATUS = ("NOT_INDEPENDENTLY_VALIDATED: the performance figures in this metadata were produced by a procedure that "
+                  "selected the model on the same cross-validation folds used to report it (optimistic) and carry no confidence "
+                  "intervals. See docs/phase2/ML_VALIDATION_RESULTS.md. Clinically unvalidated.")
+
+_domains: dict[str, InputDomain] = {}
+
+
+def _domain_for(stem: str, kind: str, model, metadata) -> InputDomain:
+    """Fitted domain (ml/models/<stem>_domain.json, produced by training on real data) if present, otherwise a
+    PROVISIONAL domain from the model's own StandardScaler moments. Cached."""
+    if stem not in _domains:
+        fitted = MODEL_DIR / f"{stem}_domain.json"
+        if fitted.exists():
+            _domains[stem] = InputDomain.from_json(fitted.read_text())
+        else:
+            _domains[stem] = InputDomain.from_scaler(kind, metadata["feature_columns_in_order"], model.named_steps["scaler"])
+    return _domains[stem]
+
+
+def _version_info() -> dict:
+    import sklearn
+    man = json.loads((MODEL_DIR / "MANIFEST.json").read_text()) if (MODEL_DIR / "MANIFEST.json").exists() else {}
+    trained = man.get("trained_with_sklearn")
+    return {"runtime_sklearn": sklearn.__version__, "trained_with_sklearn": trained,
+            "version_mismatch": bool(trained and trained != sklearn.__version__)}
+
+
 def _load_model():
     global _model, _metadata
     if _model is None:
@@ -112,12 +140,16 @@ def _load_risk_model():
 def classify_parkinsons_voice_sample(payload: ParkinsonsVoiceFeaturesIn, user: dict = Depends(get_current_user)):
     model, metadata = _load_model()
     row = payload.model_dump(by_alias=True)
+    verdict = _domain_for("parkinsons_demo_classifier", "voice", model, metadata).check(row)
+    if not verdict.in_domain:
+        return ParkinsonsPredictionOut(abstained=True, domain=verdict.as_dict(), disclaimer=DISCLAIMER)
     X_row = pd.DataFrame([row])[metadata["feature_columns_in_order"]]
 
     predicted_class = int(model.predict(X_row)[0])
     probabilities = model.predict_proba(X_row)[0]  # [P(healthy), P(parkinsons)]
 
     return ParkinsonsPredictionOut(
+        domain=verdict.as_dict(),
         predicted_class=predicted_class,
         predicted_label="parkinsons" if predicted_class == 1 else "healthy",
         probability_healthy=round(float(probabilities[0]), 4),
@@ -130,19 +162,23 @@ def classify_parkinsons_voice_sample(payload: ParkinsonsVoiceFeaturesIn, user: d
 def parkinsons_classifier_info(user: dict = Depends(get_current_user)):
     """Returns the model's training metadata (dataset, metrics, thresholds) for transparency."""
     _, metadata = _load_model()
-    return metadata
+    return {**metadata, "runtime": _version_info(), "metrics_status": METRICS_STATUS}
 
 
 @router.post("/parkinsons-risk-classifier", response_model=ParkinsonsRiskPredictionOut)
 def classify_parkinsons_risk_trend(payload: ParkinsonsRiskFeaturesIn, user: dict = Depends(get_current_user)):
     model, metadata = _load_risk_model()
     row = payload.model_dump(by_alias=True)
+    verdict = _domain_for("parkinsons_risk_classifier", "risk", model, metadata).check(row)
+    if not verdict.in_domain:
+        return ParkinsonsRiskPredictionOut(abstained=True, domain=verdict.as_dict(), disclaimer=RISK_DISCLAIMER)
     X_row = pd.DataFrame([row])[metadata["feature_columns_in_order"]]
 
     predicted_class = int(model.predict(X_row)[0])
     probabilities = model.predict_proba(X_row)[0]  # [P(stable/improving), P(worsening)]
 
     return ParkinsonsRiskPredictionOut(
+        domain=verdict.as_dict(),
         predicted_class=predicted_class,
         predicted_label="worsening" if predicted_class == 1 else "stable_or_improving",
         probability_stable_or_improving=round(float(probabilities[0]), 4),
@@ -155,4 +191,4 @@ def classify_parkinsons_risk_trend(payload: ParkinsonsRiskFeaturesIn, user: dict
 def parkinsons_risk_classifier_info(user: dict = Depends(get_current_user)):
     """Returns the model's training metadata (dataset, metrics, thresholds) for transparency."""
     _, metadata = _load_risk_model()
-    return metadata
+    return {**metadata, "runtime": _version_info(), "metrics_status": METRICS_STATUS}

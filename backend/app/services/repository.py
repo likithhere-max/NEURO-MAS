@@ -13,7 +13,7 @@ from __future__ import annotations
 from supabase import Client
 
 from app.core.metric_semantics import classify_change
-from app.ml.personalized_anomaly import detect_personal_anomaly
+from app.ml.longitudinal import analyze_series
 from app.orchestrator.orchestrator import WorkflowState
 from app.schemas.patient_state import (
     AdherenceState,
@@ -57,25 +57,31 @@ def build_patient_state(client: Client, patient: dict) -> PatientState:
     adherence_values = [med["adherence_pct_30d"] for med in medications_rows if med["adherence_pct_30d"] is not None]
     adherence_avg = round(sum(adherence_values) / len(adherence_values), 3) if adherence_values else None
 
-    # Group individual readings by metric (already ordered oldest-first by the
-    # query above), so personalized within-patient anomaly detection (Roadmap
-    # item 6, Track 1) can compare the latest reading against THIS patient's
-    # own prior readings for that metric.
-    readings_by_metric: dict[str, list[float]] = {}
+    # Group individual readings by metric as (timestamp, value) pairs (already ordered oldest-first by the
+    # query above). Longitudinal analysis (app/ml/longitudinal.py) uses the real timestamps; it only ever
+    # compares a patient with their OWN history, never with a population.
+    readings_by_metric: dict[str, tuple[list, list]] = {}
     for r in readings_rows:
-        readings_by_metric.setdefault(r["metric"], []).append(r["value"])
+        times, vals = readings_by_metric.setdefault(r["metric"], ([], []))
+        times.append(r.get("recorded_at"))
+        vals.append(r["value"])
 
     def _anomaly_fields(metric_name: str) -> dict:
-        values = readings_by_metric.get(metric_name, [])
+        times, values = readings_by_metric.get(metric_name, ([], []))
         if not values:
             return {}
-        history, latest = values[:-1], values[-1]
-        result = detect_personal_anomaly(history, latest)
+        report = analyze_series(metric_name, times, values)
+        point = report.statistics.get("point_t_interval", {}) if report.statistics else {}
+        if report.detection_status in ("insufficient_data", "invalid_input"):
+            method = "insufficient_history" if report.detection_status == "insufficient_data" else "invalid_input"
+        else:
+            method = report.method_version
         return {
-            "anomaly_method": result["method"],
-            "anomaly_z_score": result["z_score"],
-            "is_personal_anomaly": result["is_anomaly"],
-            "readings_available": result["readings_available"],
+            "anomaly_method": method,
+            "anomaly_z_score": point.get("z_score"),
+            "is_personal_anomaly": report.any_signal,
+            "readings_available": report.observation_count,
+            "anomaly_report": report.as_dict(),
         }
 
     trends = [
@@ -137,7 +143,22 @@ def build_patient_state(client: Client, patient: dict) -> PatientState:
     return state
 
 
-def persist_workflow(client: Client, state: WorkflowState) -> dict:
+def consensus_to_dict(c) -> dict | None:
+    if c is None:
+        return None
+    return {
+        "top_hypothesis": c.top_hypothesis, "disagreement": c.disagreement,
+        "hypotheses": [h.__dict__ for h in c.hypotheses], "margin": c.margin,
+        "action_permitted": c.action_permitted, "reason": c.reason,
+        # honest labelling of what the numbers are (docs/phase2/CONSENSUS_DESIGN.md)
+        "score_kind": c.score_kind, "calibrated": c.calibrated, "probability": c.probability,
+        "ties": c.ties, "caveats": c.caveats, "non_voting_agents": c.non_voting_agents,
+    }
+
+
+def build_persist_payload(state: WorkflowState) -> dict:
+    """Everything that must be stored for one workflow, as plain JSON-able rows. Pure function (unit-testable
+    without a database); consumed by both the RPC path and the sequential fallback."""
     wf_row = {
         "id": state.workflow_id,
         "patient_id": state.patient_id,
@@ -147,86 +168,115 @@ def persist_workflow(client: Client, state: WorkflowState) -> dict:
         "started_at": state.started_at,
         "completed_at": state.completed_at,
         "result_json": {
-            "consensus": {
-                "top_hypothesis": state.consensus.top_hypothesis if state.consensus else None,
-                "disagreement": state.consensus.disagreement if state.consensus else None,
-                "hypotheses": [h.__dict__ for h in state.consensus.hypotheses] if state.consensus else [],
-                "margin": state.consensus.margin if state.consensus else None,
-                "action_permitted": state.consensus.action_permitted if state.consensus else None,
-                "reason": state.consensus.reason if state.consensus else None,
-            } if state.consensus else None,
+            "consensus": consensus_to_dict(state.consensus),
             "degraded": getattr(state, "degraded", False),
             "failed_agents": getattr(state, "failed_agents", []),
+            "timed_out_agents": getattr(state, "timed_out_agents", []),
+            "deadline_exceeded": getattr(state, "deadline_exceeded", False),
             "emergency_screen": getattr(state, "emergency_screen", {}),
         },
     }
-    result = client.table("workflows").insert(wf_row).execute()
-    if not result.data:
-        raise RuntimeError("Failed to persist workflow")
-    wf = result.data[0]
-
-    event_log_rows = [
-        {
-            "workflow_id": state.workflow_id,
-            "patient_id": state.patient_id,
-            "agent_name": agent_name,
-            "status": agent_result.status,
-            "confidence": agent_result.confidence,
-            "result_json": agent_result.model_dump(mode="json"),
-        }
-        for agent_name, agent_result in state.agent_results.items()
+    events = [
+        {"workflow_id": state.workflow_id, "patient_id": state.patient_id, "agent_name": n,
+         "status": r.status, "confidence": r.confidence, "result_json": r.model_dump(mode="json")}
+        for n, r in state.agent_results.items()
     ]
-    if event_log_rows:
-        client.table("agent_event_log").insert(event_log_rows).execute()
-
-    audit_rows = [
-        {
-            "workflow_id": state.workflow_id,
-            "patient_id": state.patient_id,
-            "event": event["event"],
-            "detail_json": event["detail"],
-            "timestamp": event["timestamp"],
-        }
-        for event in state.audit_events
+    audits = [
+        {"workflow_id": state.workflow_id, "patient_id": state.patient_id, "event": e["event"],
+         "detail_json": e["detail"], "timestamp": e["timestamp"]}
+        for e in state.audit_events
     ]
-    if audit_rows:
-        client.table("audit_events").insert(audit_rows).execute()
-
-    action_rows = []
-    alert_rows = []
-    for action in state.proposed_actions:
-        action_rows.append({
-            "id": action.action_id,
-            "patient_id": action.patient_id,
-            "workflow_id": action.workflow_id,
-            "action_type": action.action_type,
-            "reason": action.reason,
-            "evidence_json": action.evidence,
-            "risk_level": action.risk_level,
-            "autonomy_level": action.autonomy_level,
-            "requires_human_approval": action.requires_human_approval,
-            "approved_by": action.approved_by,
-            "status": action.status,
-            "safety_reasons_json": action.safety_reasons,
+    actions, alerts = [], []
+    for a in state.proposed_actions:
+        actions.append({
+            "id": a.action_id, "patient_id": a.patient_id, "workflow_id": a.workflow_id, "action_type": a.action_type,
+            "reason": a.reason, "evidence_json": a.evidence, "risk_level": a.risk_level,
+            "autonomy_level": a.autonomy_level, "requires_human_approval": a.requires_human_approval,
+            "approved_by": a.approved_by, "status": a.status, "safety_reasons_json": a.safety_reasons,
         })
         # Medium+ risk / human-review actions surface as Alerts for the UI.
-        if action.requires_human_approval or action.risk_level in {"high", "restricted"}:
-            alert_rows.append({
-                "patient_id": action.patient_id,
-                "workflow_id": action.workflow_id,
-                "severity": "critical" if state.is_emergency and action.action_type == "emergency_escalation" else (
-                    "high" if action.risk_level in {"high", "restricted"} else "medium"
-                ),
-                "reason": action.reason,
-                "evidence_json": action.evidence,
-                "status": "open",
+        if a.requires_human_approval or a.risk_level in {"high", "restricted"}:
+            alerts.append({
+                "patient_id": a.patient_id, "workflow_id": a.workflow_id,
+                "severity": "critical" if state.is_emergency and a.action_type == "emergency_escalation" else (
+                    "high" if a.risk_level in {"high", "restricted"} else "medium"),
+                "reason": a.reason, "evidence_json": a.evidence, "status": "open",
             })
-    if action_rows:
-        client.table("actions").insert(action_rows).execute()
-    if alert_rows:
-        client.table("alerts").insert(alert_rows).execute()
+    return {"workflow": wf_row, "agent_events": events, "audit_events": audits, "actions": actions, "alerts": alerts}
 
+
+def persist_workflow(client: Client, state: WorkflowState) -> dict:
+    """
+    Store a finished workflow. Two paths:
+
+      * settings.persist_via_rpc  -> one transaction (RPC `persist_workflow_atomic`; all-or-nothing, idempotent on
+        the workflow id via ON CONFLICT DO NOTHING).
+      * default (sequential)      -> the workflow row is written FIRST with result_json.persist_state="persisting",
+        children next, and the marker is flipped to "complete" LAST. A crash in between therefore leaves a row that
+        says it is incomplete rather than a silently partial "completed" run, and a retry with the same workflow id
+        (idempotency key) detects it and rewrites the children instead of duplicating them.
+    """
+    from app.core.config import get_settings
+
+    payload = build_persist_payload(state)
+    wf_row = payload["workflow"]
+
+    if get_settings().persist_via_rpc:
+        res = client.rpc("persist_workflow_atomic", {"p_payload": payload}).execute()
+        data = res.data
+        if isinstance(data, list):
+            data = data[0] if data else None
+        if not data:
+            raise RuntimeError("persist_workflow_atomic returned no result")
+        return data if isinstance(data, dict) else {"id": state.workflow_id}
+
+    existing = client.table("workflows").select("*").eq("id", state.workflow_id).execute().data
+    if existing:
+        if (existing[0].get("result_json") or {}).get("persist_state", "complete") == "complete":
+            return existing[0]                       # idempotent replay: already fully stored
+        for table in ("agent_event_log", "audit_events", "actions"):   # incomplete earlier attempt: rewrite children
+            client.table(table).delete().eq("workflow_id", state.workflow_id).execute()
+        wf = existing[0]
+    else:
+        pending = {**wf_row, "result_json": {**wf_row["result_json"], "persist_state": "persisting"}}
+        result = client.table("workflows").insert(pending).execute()
+        if not result.data:
+            raise RuntimeError("Failed to persist workflow")
+        wf = result.data[0]
+
+    try:
+        for table, rows in (("agent_event_log", payload["agent_events"]), ("audit_events", payload["audit_events"]),
+                            ("actions", payload["actions"]), ("alerts", payload["alerts"])):
+            if rows:
+                client.table(table).insert(rows).execute()
+        final = {**wf_row["result_json"], "persist_state": "complete"}
+        client.table("workflows").update({"result_json": final}).eq("id", state.workflow_id).execute()
+    except Exception:
+        try:   # best-effort: record that the stored run is incomplete (never raises over the original error)
+            client.table("workflows").update(
+                {"result_json": {**wf_row["result_json"], "persist_state": "incomplete"}}).eq("id", state.workflow_id).execute()
+        except Exception:
+            pass
+        raise
     return wf
+
+
+def record_emergency_checkpoint(client: Client, state: WorkflowState) -> bool:
+    """Durable early record of a pre-scan emergency, written BEFORE the slow agents run so that a later crash,
+    timeout, client disconnect or persistence failure cannot lose it. Idempotent per workflow id."""
+    if not state.is_emergency:
+        return False
+    marker = "EMERGENCY PRE-SCAN"
+    existing = client.table("alerts").select("id,reason").eq("workflow_id", state.workflow_id).execute().data or []
+    if any(str(a.get("reason", "")).startswith(marker) for a in existing):
+        return True
+    client.table("alerts").insert({
+        "patient_id": state.patient_id, "workflow_id": state.workflow_id, "severity": "critical",
+        "reason": f"{marker}: possible emergency detected by the deterministic screen (workflow {state.workflow_id}); "
+                  "full assessment still running -- clinician review required.",
+        "evidence_json": state.emergency_screen.get("matched", []), "status": "open",
+    }).execute()
+    return True
 
 
 def build_case_context(client: Client, patient_id: str, patient: dict | None = None) -> dict:

@@ -22,6 +22,9 @@ class FakeQuery:
         self.name, self.db, self.fail, self.op, self.payload, self.filters = name, db, fail_tables, "select", None, []
     def select(self, *a, **k): self.op = "select"; return self
     def insert(self, payload): self.op, self.payload = "insert", payload; return self
+    def update(self, payload): self.op, self.payload = "update", payload; return self
+    def delete(self): self.op = "delete"; return self
+    def limit(self, *a, **k): return self
     def eq(self, c, v): self.filters.append((c, v)); return self
     def order(self, *a, **k): return self
     def execute(self):
@@ -33,6 +36,13 @@ class FakeQuery:
             self.db.setdefault(self.name, []).extend(stored)
             return _Res(stored)
         rows = [r for r in self.db.get(self.name, []) if all(r.get(c) == v for c, v in self.filters)]
+        if self.op == "update":
+            if self.name in self.fail:
+                raise RuntimeError(f"simulated DB failure on {self.name}")
+            for r in rows:
+                r.update(copy.deepcopy(self.payload))
+        if self.op == "delete":
+            self.db[self.name] = [r for r in self.db.get(self.name, []) if r not in rows]
         return _Res(rows)
 
 
@@ -115,8 +125,97 @@ def test_invalid_payload_is_rejected_with_422(setup, bad):
     assert r.status_code == 422
 
 
-def test_duplicate_submission_creates_two_workflows_documented_gap(setup):
-    """No idempotency key exists: a retried POST creates a second workflow + alerts (see OUTSTANDING_ISSUES)."""
+def test_duplicate_submission_without_key_creates_two_workflows_by_design(setup):
+    """Without an Idempotency-Key the server cannot know a POST is a retry; clients that retry must send a key."""
     db, _ = setup
     _post("I can't breathe"); _post("I can't breathe")
     assert len(db["workflows"]) == 2
+
+
+# ---------------- Phase 2: idempotency, durable state, emergency checkpoint ----------------
+KEY = "retry-key-0001"
+
+
+def _post_key(text, key=KEY):
+    return client.post("/api/v1/workflows/neurological-assessment/pat1", headers={"Idempotency-Key": key}, json={
+        "trigger_reason": "t", "observations": {"symptoms": [{"name": "symptom", "free_text": text}]}})
+
+
+def test_same_idempotency_key_returns_stored_result_and_creates_no_duplicates(setup):
+    db, _ = setup
+    first = _post_key("I can't breathe").json()
+    n_actions, n_alerts, n_events = len(db["actions"]), len(db["alerts"]), len(db["agent_event_log"])
+    again = _post_key("I can't breathe")
+    assert again.status_code == 200
+    body = again.json()
+    assert body["idempotent_replay"] is True and body["workflow_id"] == first["workflow_id"]
+    assert len(db["workflows"]) == 1
+    assert (len(db["actions"]), len(db["alerts"]), len(db["agent_event_log"])) == (n_actions, n_alerts, n_events)
+    assert body["is_emergency"] is True            # the stored emergency result is replayed, not lost
+
+
+def test_different_keys_or_patients_do_not_collide(setup):
+    db, _ = setup
+    a = _post_key("mild headache", "key-aaaaaaaa").json()["workflow_id"]
+    b = _post_key("mild headache", "key-bbbbbbbb").json()["workflow_id"]
+    assert a != b and len(db["workflows"]) == 2
+
+
+@pytest.mark.parametrize("bad", ["short", "has space in it", "x" * 129, "semi;colon-key"])
+def test_malformed_idempotency_key_is_rejected(setup, bad):
+    r = client.post("/api/v1/workflows/neurological-assessment/pat1", headers={"Idempotency-Key": bad},
+                    json={"trigger_reason": "t", "observations": {"symptoms": []}})
+    assert r.status_code == 422
+
+
+def test_completed_run_is_marked_persist_state_complete(setup):
+    db, _ = setup
+    _post_key("mild headache")
+    assert db["workflows"][0]["result_json"]["persist_state"] == "complete"
+
+
+def test_child_table_failure_leaves_an_incomplete_marker_and_retry_repairs_it(setup):
+    db, holder = setup
+    holder["fail"] = ("actions",)
+    r = _post_key("I can't breathe")                      # emergency: result is still returned
+    assert r.status_code == 200 and r.json()["persisted"] is False and r.json()["is_emergency"] is True
+    # the update on 'workflows' is not in the failure set, so the marker records the failure honestly
+    assert db["workflows"][0]["result_json"]["persist_state"] == "incomplete"
+    holder["fail"] = ()
+    again = _post_key("I can't breathe")                  # not "complete" -> NOT a replay: rewrites children
+    assert again.status_code == 200 and again.json().get("idempotent_replay") is None
+    assert again.json()["persisted"] is True and len(db["workflows"]) == 1
+    assert db["workflows"][0]["result_json"]["persist_state"] == "complete"
+    ids = [a["id"] for a in db["actions"]]
+    assert len(ids) == len(set(ids))
+
+
+def test_emergency_alert_is_written_before_agents_run_even_if_everything_else_fails(setup, monkeypatch):
+    """Checkpoint durability: the pre-scan alert survives total persistence failure of the final write."""
+    db, holder = setup
+    holder["fail"] = ("workflows", "agent_event_log", "audit_events", "actions")
+    r = _post_key("my face is drooping and my speech is slurred")
+    assert r.status_code == 200 and r.json()["persisted"] is False and r.json()["is_emergency"] is True
+    pre = [a for a in db["alerts"] if str(a["reason"]).startswith("EMERGENCY PRE-SCAN")]
+    assert len(pre) == 1 and pre[0]["severity"] == "critical"
+
+
+def test_checkpoint_is_idempotent_across_retries(setup):
+    db, holder = setup
+    holder["fail"] = ("workflows",)
+    _post_key("I can't breathe"); _post_key("I can't breathe")
+    assert len([a for a in db["alerts"] if str(a["reason"]).startswith("EMERGENCY PRE-SCAN")]) == 1
+
+
+def test_non_emergency_run_writes_no_checkpoint_alert(setup):
+    db, _ = setup
+    _post_key("mild headache")
+    assert not [a for a in db.get("alerts", []) if str(a["reason"]).startswith("EMERGENCY PRE-SCAN")]
+
+
+def test_response_exposes_typed_consensus_labels_and_run_health(setup):
+    body = _post("my hand shakes at rest, stiffness and slow movement").json()
+    assert "timed_out_agents" in body and "deadline_exceeded" in body
+    if body["consensus"]:
+        c = body["consensus"]
+        assert c["calibrated"] is False and c["probability"] is None and c["score_kind"] == "uncalibrated_support_index"

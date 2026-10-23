@@ -1,3 +1,7 @@
+# SUPERSEDED (Phase 2): this script selects its winner on the same cross-validation folds it reports, so its printed
+# metrics are optimistic, and it records no dataset hash / library versions. It produced the artifacts currently in
+# ml/models/ and is kept for provenance only. Use `python -m ml.validation.validate_models` for evaluation and
+# `python -m ml.training.train_final` for training. See docs/phase2/ML_EXPERIMENT_PROTOCOL.md.
 ﻿"""
 Roadmap item 6, Track 2 (REVISED #3 -- model comparison under Leave-One-
 Subject-Out CV): train and validate a demonstration classifier on the public

@@ -1,0 +1,511 @@
+{
+  "seed": 20261023,
+  "reps": 400,
+  "series_length": 40,
+  "python": "3.13.17",
+  "numpy": "2.5.4",
+  "default_config": {
+    "baseline_n": 5,
+    "point_alpha_signal": 0.001,
+    "point_alpha_note": 0.05,
+    "point_alpha_provenance": "Student-t prediction interval; signal alpha chosen from ml/simulation/results/anomaly_study.json (repeated testing)",
+    "sequential_min_n": 15,
+    "sequential_max_rho": 0.3,
+    "cusum_k": 0.5,
+    "cusum_h": 5.0,
+    "ewma_lambda": 0.2,
+    "ewma_L": 3.0,
+    "trend_min_n": 8,
+    "trend_alpha": 0.01,
+    "trend_min_effect_sd": 1.0,
+    "irregular_gap_cv": 0.75,
+    "stale_days": null,
+    "mcid": null,
+    "mcid_provenance": null
+  },
+  "null": {
+    "iid_gaussian": {
+      "gate_0.2": {
+        "single_review": {
+          "n=12": {
+            "any": 0.0075,
+            "point": 0.0025,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.005
+          },
+          "n=20": {
+            "any": 0.0125,
+            "point": 0.0,
+            "cusum": 0.01,
+            "ewma": 0.01,
+            "trend": 0.0025
+          },
+          "n=40": {
+            "any": 0.055,
+            "point": 0.0,
+            "cusum": 0.0475,
+            "ewma": 0.0325,
+            "trend": 0.01
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.1075,
+          "point": 0.02,
+          "cusum": 0.0475,
+          "ewma": 0.0325,
+          "trend": 0.055
+        }
+      },
+      "gate_0.3": {
+        "single_review": {
+          "n=12": {
+            "any": 0.0075,
+            "point": 0.0025,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.005
+          },
+          "n=20": {
+            "any": 0.0175,
+            "point": 0.0,
+            "cusum": 0.01,
+            "ewma": 0.015,
+            "trend": 0.0025
+          },
+          "n=40": {
+            "any": 0.0675,
+            "point": 0.0,
+            "cusum": 0.0525,
+            "ewma": 0.0425,
+            "trend": 0.01
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.115,
+          "point": 0.02,
+          "cusum": 0.0525,
+          "ewma": 0.0425,
+          "trend": 0.055
+        }
+      },
+      "gate_off": {
+        "single_review": {
+          "n=12": {
+            "any": 0.0075,
+            "point": 0.0025,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.005
+          },
+          "n=20": {
+            "any": 0.03,
+            "point": 0.0,
+            "cusum": 0.025,
+            "ewma": 0.0225,
+            "trend": 0.0025
+          },
+          "n=40": {
+            "any": 0.08,
+            "point": 0.0,
+            "cusum": 0.0675,
+            "ewma": 0.0525,
+            "trend": 0.01
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.1275,
+          "point": 0.02,
+          "cusum": 0.0675,
+          "ewma": 0.0525,
+          "trend": 0.055
+        }
+      }
+    },
+    "ar1_0.3": {
+      "gate_0.2": {
+        "single_review": {
+          "n=12": {
+            "any": 0.015,
+            "point": 0.0,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.015
+          },
+          "n=20": {
+            "any": 0.0675,
+            "point": 0.0075,
+            "cusum": 0.0125,
+            "ewma": 0.0425,
+            "trend": 0.025
+          },
+          "n=40": {
+            "any": 0.13,
+            "point": 0.0,
+            "cusum": 0.0775,
+            "ewma": 0.09,
+            "trend": 0.0275
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.2575,
+          "point": 0.04,
+          "cusum": 0.0775,
+          "ewma": 0.09,
+          "trend": 0.175
+        }
+      },
+      "gate_0.3": {
+        "single_review": {
+          "n=12": {
+            "any": 0.015,
+            "point": 0.0,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.015
+          },
+          "n=20": {
+            "any": 0.0825,
+            "point": 0.0075,
+            "cusum": 0.0375,
+            "ewma": 0.0525,
+            "trend": 0.025
+          },
+          "n=40": {
+            "any": 0.19,
+            "point": 0.0,
+            "cusum": 0.14,
+            "ewma": 0.13,
+            "trend": 0.0275
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.295,
+          "point": 0.04,
+          "cusum": 0.14,
+          "ewma": 0.13,
+          "trend": 0.175
+        }
+      },
+      "gate_off": {
+        "single_review": {
+          "n=12": {
+            "any": 0.015,
+            "point": 0.0,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.015
+          },
+          "n=20": {
+            "any": 0.125,
+            "point": 0.0075,
+            "cusum": 0.0925,
+            "ewma": 0.08,
+            "trend": 0.025
+          },
+          "n=40": {
+            "any": 0.3225,
+            "point": 0.0,
+            "cusum": 0.295,
+            "ewma": 0.2125,
+            "trend": 0.0275
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.3825,
+          "point": 0.04,
+          "cusum": 0.295,
+          "ewma": 0.2125,
+          "trend": 0.175
+        }
+      }
+    },
+    "ar1_0.6": {
+      "gate_0.2": {
+        "single_review": {
+          "n=12": {
+            "any": 0.075,
+            "point": 0.0025,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.0725
+          },
+          "n=20": {
+            "any": 0.075,
+            "point": 0.0025,
+            "cusum": 0.0275,
+            "ewma": 0.0325,
+            "trend": 0.0475
+          },
+          "n=40": {
+            "any": 0.09,
+            "point": 0.0,
+            "cusum": 0.05,
+            "ewma": 0.0625,
+            "trend": 0.035
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.3175,
+          "point": 0.0425,
+          "cusum": 0.05,
+          "ewma": 0.0625,
+          "trend": 0.2575
+        }
+      },
+      "gate_0.3": {
+        "single_review": {
+          "n=12": {
+            "any": 0.075,
+            "point": 0.0025,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.0725
+          },
+          "n=20": {
+            "any": 0.1225,
+            "point": 0.0025,
+            "cusum": 0.075,
+            "ewma": 0.0725,
+            "trend": 0.0475
+          },
+          "n=40": {
+            "any": 0.19,
+            "point": 0.0,
+            "cusum": 0.15,
+            "ewma": 0.1325,
+            "trend": 0.035
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.37,
+          "point": 0.0425,
+          "cusum": 0.15,
+          "ewma": 0.1325,
+          "trend": 0.2575
+        }
+      },
+      "gate_off": {
+        "single_review": {
+          "n=12": {
+            "any": 0.075,
+            "point": 0.0025,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.0725
+          },
+          "n=20": {
+            "any": 0.2825,
+            "point": 0.0025,
+            "cusum": 0.2575,
+            "ewma": 0.1975,
+            "trend": 0.0475
+          },
+          "n=40": {
+            "any": 0.635,
+            "point": 0.0,
+            "cusum": 0.615,
+            "ewma": 0.5175,
+            "trend": 0.035
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.685,
+          "point": 0.0425,
+          "cusum": 0.615,
+          "ewma": 0.5175,
+          "trend": 0.2575
+        }
+      }
+    },
+    "iid_t3": {
+      "gate_0.2": {
+        "single_review": {
+          "n=12": {
+            "any": 0.01,
+            "point": 0.0075,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.0025
+          },
+          "n=20": {
+            "any": 0.0725,
+            "point": 0.0175,
+            "cusum": 0.04,
+            "ewma": 0.0575,
+            "trend": 0.0025
+          },
+          "n=40": {
+            "any": 0.19,
+            "point": 0.015,
+            "cusum": 0.13,
+            "ewma": 0.16,
+            "trend": 0.005
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.4275,
+          "point": 0.3775,
+          "cusum": 0.13,
+          "ewma": 0.16,
+          "trend": 0.055
+        }
+      },
+      "gate_0.3": {
+        "single_review": {
+          "n=12": {
+            "any": 0.01,
+            "point": 0.0075,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.0025
+          },
+          "n=20": {
+            "any": 0.075,
+            "point": 0.0175,
+            "cusum": 0.0425,
+            "ewma": 0.0575,
+            "trend": 0.0025
+          },
+          "n=40": {
+            "any": 0.2025,
+            "point": 0.015,
+            "cusum": 0.1425,
+            "ewma": 0.1725,
+            "trend": 0.005
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.43,
+          "point": 0.3775,
+          "cusum": 0.1425,
+          "ewma": 0.1725,
+          "trend": 0.055
+        }
+      },
+      "gate_off": {
+        "single_review": {
+          "n=12": {
+            "any": 0.01,
+            "point": 0.0075,
+            "cusum": 0.0,
+            "ewma": 0.0,
+            "trend": 0.0025
+          },
+          "n=20": {
+            "any": 0.08,
+            "point": 0.0175,
+            "cusum": 0.0475,
+            "ewma": 0.06,
+            "trend": 0.0025
+          },
+          "n=40": {
+            "any": 0.215,
+            "point": 0.015,
+            "cusum": 0.155,
+            "ewma": 0.18,
+            "trend": 0.005
+          }
+        },
+        "family_wise_any_review_10_to_40": {
+          "any": 0.435,
+          "point": 0.3775,
+          "cusum": 0.155,
+          "ewma": 0.18,
+          "trend": 0.055
+        }
+      }
+    }
+  },
+  "alternatives": {
+    "step_2sd": {
+      "gate_0.2": {
+        "any": 0.91,
+        "point": 0.0025,
+        "cusum": 0.6725,
+        "ewma": 0.615,
+        "trend": 0.8
+      },
+      "gate_0.3": {
+        "any": 0.9675,
+        "point": 0.0025,
+        "cusum": 0.9,
+        "ewma": 0.805,
+        "trend": 0.8
+      },
+      "gate_off": {
+        "any": 1.0,
+        "point": 0.0025,
+        "cusum": 0.995,
+        "ewma": 0.9675,
+        "trend": 0.8
+      }
+    },
+    "step_3sd": {
+      "gate_0.2": {
+        "any": 0.915,
+        "point": 0.0,
+        "cusum": 0.7025,
+        "ewma": 0.675,
+        "trend": 0.8375
+      },
+      "gate_0.3": {
+        "any": 0.955,
+        "point": 0.0,
+        "cusum": 0.86,
+        "ewma": 0.8325,
+        "trend": 0.8375
+      },
+      "gate_off": {
+        "any": 0.995,
+        "point": 0.0,
+        "cusum": 0.9925,
+        "ewma": 0.9825,
+        "trend": 0.8375
+      }
+    },
+    "drift_3sd_total": {
+      "gate_0.2": {
+        "any": 0.9975,
+        "point": 0.0025,
+        "cusum": 0.55,
+        "ewma": 0.5025,
+        "trend": 0.99
+      },
+      "gate_0.3": {
+        "any": 0.9975,
+        "point": 0.0025,
+        "cusum": 0.7825,
+        "ewma": 0.7275,
+        "trend": 0.99
+      },
+      "gate_off": {
+        "any": 0.9975,
+        "point": 0.0025,
+        "cusum": 0.97,
+        "ewma": 0.925,
+        "trend": 0.99
+      }
+    }
+  },
+  "rejected_fixed_baseline": {
+    "note": "Exploratory run (not production code): CUSUM/EWMA with textbook limits (h=5, L=3) standardised by a FIXED baseline of b readings, family-wise false-alarm probability over 35 monitoring steps, iid Gaussian noise, 20000 reps.",
+    "median_abs_deviation_scale": {
+      "b=5": 0.65,
+      "b=8": 0.54,
+      "b=12": 0.45,
+      "b=20": 0.34,
+      "b=30": 0.27,
+      "b=50": 0.2
+    },
+    "sample_sd_scale": {
+      "b=5": 0.51,
+      "b=8": 0.41,
+      "b=12": 0.32,
+      "b=20": 0.24,
+      "b=30": 0.18,
+      "b=50": 0.13
+    },
+    "conclusion": "estimation error in a short baseline makes textbook limits unusable (nominal ~7%); replaced by self-starting Q-statistic charts, whose iid-null family-wise false-alarm rate over 40 readings was 6.9% (CUSUM) / 7.0% (EWMA) in a separate 20000-rep run."
+  }
+}

@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import re
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.core.supabase_client import get_authed_client
 from app.orchestrator.orchestrator import run_workflow
 from app.schemas.api import WorkflowTriggerIn
 from app.schemas.symptom_assessment import SymptomAssessmentIn
 from app.services.auth import get_current_user
-from app.services.repository import build_patient_state, persist_workflow
+from app.services.repository import (
+    build_patient_state,
+    consensus_to_dict,
+    persist_workflow,
+    record_emergency_checkpoint,
+)
 from app.services.symptom_extraction import (
     SymptomExtractionError,
     extract_symptom_profile,
@@ -18,6 +26,35 @@ from app.services.symptom_extraction import (
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 logger = logging.getLogger("neuromas.workflows")
+
+
+_IDEM_RE = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
+
+
+def _workflow_id_for(patient_id: str, idempotency_key: str | None) -> str | None:
+    """Deterministic workflow id from (patient, Idempotency-Key): a retried request maps to the SAME row, and the
+    primary key makes a second concurrent insert fail instead of duplicating the run."""
+    if idempotency_key is None:
+        return None
+    if not _IDEM_RE.match(idempotency_key):
+        raise HTTPException(422, "Idempotency-Key must be 8-128 characters from [A-Za-z0-9._:-]")
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"neuromas:{patient_id}:{idempotency_key}"))
+
+
+def _stored_complete_workflow(client, workflow_id: str | None):
+    if not workflow_id:
+        return None
+    rows = client.table("workflows").select("*").eq("id", workflow_id).execute().data
+    if rows and (rows[0].get("result_json") or {}).get("persist_state", "complete") == "complete":
+        return rows[0]
+    return None
+
+
+def _emergency_checkpoint(client):
+    async def cb(state, name):
+        # blocking Supabase call off the event loop; failure is logged by the orchestrator, never fatal
+        await asyncio.to_thread(record_emergency_checkpoint, client, state)
+    return cb
 
 
 def _persist_or_degrade(client, workflow_state) -> bool:
@@ -43,13 +80,18 @@ async def trigger_neurological_assessment(
     patient_id: str,
     payload: WorkflowTriggerIn,
     user: dict = Depends(get_current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     client = get_authed_client(user["_access_token"])
+    workflow_id = _workflow_id_for(patient_id, idempotency_key)
 
     patient_result = client.table("patients").select("*").eq("id", patient_id).execute()
     if not patient_result.data:
         raise HTTPException(404, "patient not found")
     patient = patient_result.data[0]
+
+    if _stored_complete_workflow(client, workflow_id):
+        return {"idempotent_replay": True, **_load_workflow(client, workflow_id)}
 
     patient_state = build_patient_state(client, patient)
     input_payload = {
@@ -64,6 +106,8 @@ async def trigger_neurological_assessment(
         trigger_reason=payload.trigger_reason,
         input_payload=input_payload,
         patient_state=patient_state,
+        workflow_id=workflow_id,
+        on_checkpoint=_emergency_checkpoint(client),
     )
 
     # persist_workflow() must run BEFORE the observations insert below: unlike
@@ -103,6 +147,7 @@ async def trigger_symptom_assessment(
     patient_id: str,
     payload: SymptomAssessmentIn,
     user: dict = Depends(get_current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     """
     Real natural-language symptom entry point (2-day review sprint feature).
@@ -115,6 +160,7 @@ async def trigger_symptom_assessment(
     diagnostic pipeline.
     """
     client = get_authed_client(user["_access_token"])
+    workflow_id = _workflow_id_for(patient_id, idempotency_key)
 
     patient_result = client.table("patients").select("*").eq("id", patient_id).execute()
     if not patient_result.data:
@@ -123,6 +169,12 @@ async def trigger_symptom_assessment(
 
     if not payload.free_text or not payload.free_text.strip():
         raise HTTPException(422, "free_text is required")
+
+    if _stored_complete_workflow(client, workflow_id):      # replay BEFORE paying for another LLM extraction
+        stored = client.table("symptom_assessments").select("*").eq("workflow_id", workflow_id).limit(1).execute().data
+        return {"idempotent_replay": True, "assessment": stored[0] if stored else None,
+                "extracted": stored[0]["extracted_json"] if stored else None,
+                "workflow": _load_workflow(client, workflow_id)}
 
     try:
         extracted = await extract_symptom_profile(payload)
@@ -144,6 +196,8 @@ async def trigger_symptom_assessment(
         trigger_reason="patient_symptom_assessment",
         input_payload=input_payload,
         patient_state=patient_state,
+        workflow_id=workflow_id,
+        on_checkpoint=_emergency_checkpoint(client),
     )
 
     # Same ordering requirement as trigger_neurological_assessment above:
@@ -197,7 +251,10 @@ def list_symptom_assessments(patient_id: str, user: dict = Depends(get_current_u
 @router.get("/{workflow_id}")
 def get_workflow(workflow_id: str, user: dict = Depends(get_current_user)):
     client = get_authed_client(user["_access_token"])
+    return _load_workflow(client, workflow_id)
 
+
+def _load_workflow(client, workflow_id: str) -> dict:
     wf_result = client.table("workflows").select("*").eq("id", workflow_id).execute()
     if not wf_result.data:
         raise HTTPException(404, "workflow not found")
@@ -218,6 +275,8 @@ def get_workflow(workflow_id: str, user: dict = Depends(get_current_user)):
         "consensus": wf["result_json"].get("consensus"),
         "degraded": wf["result_json"].get("degraded", False),
         "failed_agents": wf["result_json"].get("failed_agents", []),
+        "timed_out_agents": wf["result_json"].get("timed_out_agents", []),
+        "deadline_exceeded": wf["result_json"].get("deadline_exceeded", False),
         "agent_events": [
             {"agent_name": e["agent_name"], "status": e["status"], "confidence": e["confidence"], "result": e["result_json"]}
             for e in events
@@ -235,6 +294,8 @@ def _serialize_workflow(state, persisted: bool = True) -> dict:
         "persisted": persisted,
         "degraded": getattr(state, "degraded", False),
         "failed_agents": getattr(state, "failed_agents", []),
+        "timed_out_agents": getattr(state, "timed_out_agents", []),
+        "deadline_exceeded": getattr(state, "deadline_exceeded", False),
         "emergency_screen": getattr(state, "emergency_screen", {}),
         "workflow_id": state.workflow_id,
         "patient_id": state.patient_id,
@@ -243,13 +304,7 @@ def _serialize_workflow(state, persisted: bool = True) -> dict:
         "trigger_reason": state.trigger_reason,
         "started_at": state.started_at,
         "completed_at": state.completed_at,
-        "consensus": {
-            "top_hypothesis": state.consensus.top_hypothesis,
-            "disagreement": state.consensus.disagreement,
-            "hypotheses": [h.__dict__ for h in state.consensus.hypotheses],
-            "action_permitted": state.consensus.action_permitted,
-            "reason": state.consensus.reason,
-        } if state.consensus else None,
+        "consensus": consensus_to_dict(state.consensus),
         "agent_results": {name: r.model_dump() for name, r in state.agent_results.items()},
         "proposed_actions": [a.__dict__ for a in state.proposed_actions],
         "audit_trail": state.audit_events,

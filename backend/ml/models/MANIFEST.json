@@ -3,5 +3,7 @@
   "sha256": {
     "parkinsons_demo_classifier.joblib": "048678799e7bbe4e2d4d4b4113eb01b6c1029fd80460f20b2fab23b59cc1cd04",
     "parkinsons_risk_classifier.joblib": "8ab2957fd07284981207147390ac3b92ccb9e8820961a3781d8ba5b1329226a9"
-  }
+  },
+  "trained_with_sklearn": "1.9.0",
+  "_trained_with_sklearn_evidence": "sklearn 1.9.1 emits InconsistentVersionWarning on unpickling: 'from version 1.9.0'. Retraining under the pinned version is recommended (needs the UCI data)."
 }

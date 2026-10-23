@@ -10,7 +10,17 @@ from app.services.auth import get_current_user
 
 client = TestClient(app)
 META = json.loads((Path(__file__).resolve().parent.parent / "ml/models/parkinsons_demo_classifier_metadata.json").read_text())
-ROW = {c: 1.0 for c in META["feature_columns_in_order"]}
+ROW = {c: 1.0 for c in META["feature_columns_in_order"]}   # deliberately NOT a realistic voice sample
+
+
+def _mean_row(stem):
+    import warnings
+    import joblib
+    meta = json.loads((Path(__file__).resolve().parent.parent / f"ml/models/{stem}_metadata.json").read_text())
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sc = joblib.load(Path(__file__).resolve().parent.parent / f"ml/models/{stem}.joblib").named_steps["scaler"]
+    return dict(zip(meta["feature_columns_in_order"], map(float, sc.mean_)))
 
 
 @pytest.fixture(autouse=True)
@@ -25,10 +35,18 @@ def test_ml_demo_requires_auth():
     assert client.post("/api/v1/demo/parkinsons-classifier", json=ROW).status_code in (401, 403)
 
 
-def test_ml_demo_accepts_finite_row_and_returns_probabilities():
-    r = client.post("/api/v1/demo/parkinsons-classifier", json=ROW)
+def test_ml_demo_garbage_row_abstains_instead_of_returning_a_confident_number():
+    # BEFORE Phase 2 this returned a probability for an all-ones "voice sample" (jitter=1.0, Fo=1 Hz ...).
+    body = client.post("/api/v1/demo/parkinsons-classifier", json=ROW).json()
+    assert body["abstained"] is True and body["probability_parkinsons"] is None and body["predicted_label"] is None
+    assert body["domain"]["status"] == "abstain_invalid_input" and body["domain"]["reasons"]
+
+
+def test_ml_demo_in_domain_row_returns_probabilities_and_domain_report():
+    r = client.post("/api/v1/demo/parkinsons-classifier", json=_mean_row("parkinsons_demo_classifier"))
     assert r.status_code == 200, r.text
     body = r.json()
+    assert body["abstained"] is False and body["domain"]["status"] == "in_domain"
     assert 0 <= body["probability_parkinsons"] <= 1 and body["probability_healthy"] == pytest.approx(1 - body["probability_parkinsons"], abs=1e-3)
 
 
@@ -117,3 +135,17 @@ def test_committed_artifacts_match_manifest():
     for name, h in man.items():
         assert hashlib.sha256((md.MODEL_DIR / name).read_bytes()).hexdigest() == h
     assert set(man) == {p.name for p in md.MODEL_DIR.glob("*.joblib")}
+
+
+def test_risk_demo_abstains_out_of_domain_and_predicts_in_domain():
+    mean = _mean_row("parkinsons_risk_classifier")
+    ok = client.post("/api/v1/demo/parkinsons-risk-classifier", json=mean).json()
+    assert ok["abstained"] is False and 0 <= ok["probability_worsening"] <= 1
+    bad = client.post("/api/v1/demo/parkinsons-risk-classifier", json={**mean, "test_time": -5.0}).json()
+    assert bad["abstained"] is True and bad["probability_worsening"] is None
+
+
+def test_info_endpoint_labels_metrics_as_not_independently_validated():
+    body = client.get("/api/v1/demo/parkinsons-classifier/info").json()
+    assert body["metrics_status"].startswith("NOT_INDEPENDENTLY_VALIDATED")
+    assert body["runtime"]["trained_with_sklearn"] == "1.9.0" and "version_mismatch" in body["runtime"]

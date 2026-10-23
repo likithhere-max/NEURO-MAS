@@ -47,9 +47,18 @@ def t_critical_95(df: int) -> float:
     return z + (z**3 + z) / (4 * df) + (5 * z**5 + 16 * z**3 + 3 * z) / (96 * df**2)
 
 
-def effective_z_threshold(n: int) -> float:
-    """|z| (z = (x-mean)/s) above which a new point lies outside the 95% prediction interval."""
-    return t_critical_95(n - 1) * math.sqrt(1 + 1 / n)
+def t_critical(df: int, alpha: float = 0.05) -> float:
+    """Two-sided Student-t critical value t_{1-alpha/2, df}. alpha=0.05 uses the standard table (reference-tested);
+    other alphas use scipy's exact quantile."""
+    if abs(alpha - 0.05) < 1e-12:
+        return t_critical_95(df)
+    from scipy.stats import t as _t
+    return float(_t.ppf(1 - alpha / 2, df))
+
+
+def effective_z_threshold(n: int, alpha: float = 0.05) -> float:
+    """|z| (z = (x-mean)/s) above which a new point lies outside the (1-alpha) prediction interval."""
+    return t_critical(n - 1, alpha) * math.sqrt(1 + 1 / n)
 
 
 def _result(method, n, mean=None, stdev=None, z=None, anomaly=False, threshold=None, note=None):
@@ -72,13 +81,17 @@ def detect_personal_anomaly(
     historical_values: list[float],
     latest_value: float,
     z_threshold: float | None = None,
+    alpha: float = 0.05,
 ) -> dict:
     """
     Compare `latest_value` against the patient's OWN prior readings.
 
     method: "z_score" | "zero_variance" | "insufficient_history" | "invalid_input"
-    `z_threshold=None` (default) uses the exact 95% prediction-interval
-    threshold for the available history length; pass a number to override.
+    `z_threshold=None` (default) uses the exact (1-alpha) prediction-interval
+    threshold for the available history length (alpha=0.05 by default); pass a number to override.
+    NOTE (Phase 2): applied at EVERY new reading, a 5% per-reading rate gives ~80% family-wise false alarms over 31
+    successive reviews (ml/simulation/results/anomaly_study.json). The longitudinal analysis therefore raises a SIGNAL
+    only at a much stricter alpha and reports the 5% result as an informational note.
 
     Never raises. Non-finite history values are dropped (and counted in
     `note`); a non-finite `latest_value` yields method "invalid_input".
@@ -115,7 +128,7 @@ def detect_personal_anomaly(
         tol = max(ZERO_VARIANCE_ABS_TOL, ZERO_VARIANCE_REL_TOL * abs(mean))
         return _result("zero_variance", n, mean=mean, stdev=0.0, anomaly=abs(latest - mean) > tol, note=note)
 
-    threshold = z_threshold if z_threshold is not None else effective_z_threshold(n)
+    threshold = z_threshold if z_threshold is not None else effective_z_threshold(n, alpha)
     z = (latest - mean) / stdev
     return _result("z_score", n, mean=round(mean, 4), stdev=round(stdev, 4), z=round(z, 4),
                    anomaly=abs(z) >= threshold, threshold=round(threshold, 4), note=note)

@@ -11,3 +11,5 @@ node_modules/
 backend/signup_body.json
 backend/login_body.json
 .coverage
+backend/ml/data/cache/
+.hypothesis/

@@ -41,7 +41,7 @@ async def test_non_emergency_workflow_completes_and_produces_consensus():
     assert result.status == "completed"
     assert result.is_emergency is False
     # No agent crash should ever leave the workflow half-finished.
-    assert all(r.status in {"completed", "skipped", "failed", "model_not_available"} for r in result.agent_results.values())
+    assert all(r.status in {"completed", "skipped", "failed", "model_not_available", "abstained", "timed_out", "insufficient_data"} for r in result.agent_results.values())
 
 
 @pytest.mark.asyncio
@@ -111,6 +111,8 @@ async def test_hung_agent_times_out_and_is_recorded_failed(monkeypatch):
 
     class _S:
         agent_timeout_seconds = 0.05
+        workflow_deadline_seconds = 30.0
+        max_agent_concurrency = 4
     monkeypatch.setattr(orch, "get_settings", lambda: _S())
     agent = get_agent("signal_analysis_agent")
 
@@ -120,7 +122,8 @@ async def test_hung_agent_times_out_and_is_recorded_failed(monkeypatch):
     result = await run_workflow(patient_id="p", trigger_reason="t", patient_state=PatientState(patient_id="p"),
                                 input_payload={"symptoms": [{"name": "x"}]})
     assert "signal_analysis_agent" in result.failed_agents and result.degraded is True
-    assert result.agent_results["signal_analysis_agent"].status == "failed"
+    assert result.agent_results["signal_analysis_agent"].status == "timed_out"
+    assert result.timed_out_agents == ["signal_analysis_agent"]
 
 
 @pytest.mark.asyncio

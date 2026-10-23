@@ -35,12 +35,32 @@ DETERIORATION_THRESHOLD = 0.20  # 20% adverse change vs baseline triggers a flag
 
 
 def _anomaly_direction_adverse(t) -> bool | None:
-    """True/False if the anomaly's direction is known adverse/favourable; None if polarity unknown."""
+    """True/False if the anomaly's direction is known adverse/favourable; None if polarity/direction unknown.
+
+    Uses the structured report's signals when present (any adverse signal wins); falls back to the sign of the
+    legacy point z-score otherwise."""
     from app.core.metric_semantics import metric_polarity
+    rep = getattr(t, "anomaly_report", None)
+    if rep and rep.get("signals"):
+        adv = [s.get("adverse") for s in rep["signals"]]
+        if any(a is True for a in adv):
+            return True
+        if adv and all(a is False for a in adv):
+            return False
+        return None
     pol = metric_polarity(t.metric)
     if pol == "unknown" or t.anomaly_z_score is None:
         return None
     return (t.anomaly_z_score > 0) == (pol == "higher_worse")
+
+
+def _signal_text(rep: dict) -> str:
+    parts = []
+    for s in rep.get("signals", []):
+        adv = s.get("adverse")
+        tag = "adverse" if adv is True else "favourable" if adv is False else "direction-unclassified"
+        parts.append(f"{s['method']} ({s['kind']}, {s.get('direction')}, {tag})")
+    return "; ".join(parts)
 
 
 class _TrendNarrative(BaseModel):
@@ -63,9 +83,10 @@ async def _explain_trends_with_gemini(trend_summaries: list[dict]) -> str | None
             )
         if t["is_personal_anomaly"]:
             lines.append(
-                f"- {t['metric']}: latest reading is a statistical outlier compared to "
-                f"this patient's own historical readings (z-score {t['anomaly_z_score']}, "
-                f"based on {t['readings_available']} prior reading(s) from this same patient)"
+                f"- {t['metric']}: statistical signal(s) on this patient's own readings: "
+                f"{t.get('signal_text') or 'point outlier'} "
+                f"(based on {t['readings_available']} reading(s) from this same patient; "
+                f"a signal is a prompt for clinician review, not a diagnosis)"
             )
     prompt = (
         "Here is an already-computed longitudinal trend/anomaly comparison for a patient:\n\n"
@@ -113,6 +134,8 @@ class LongitudinalAgent(BaseNeuroAgent):
         findings = []
         deteriorating, improving, stable, unclassified = [], [], [], []
         personal_anomalies = []
+        insufficient: list[str] = []
+        dq_warnings: set[str] = set()
         trend_summaries = []
         for t in trends:
             classification = None
@@ -141,18 +164,32 @@ class LongitudinalAgent(BaseNeuroAgent):
                     value=round(delta_pct, 3) if delta_pct is not None else None,
                 ))
 
+            rep = t.anomaly_report or {}
+            if rep.get("data_quality_warnings"):
+                for w in rep["data_quality_warnings"]:
+                    dq_warnings.add(f"{t.metric}:{w.split(':')[0]}")
             if t.is_personal_anomaly:
                 personal_anomalies.append(t.metric)
-                findings.append(AgentFinding(
-                    label=f"personal_anomaly:{t.metric}",
-                    detail=(
+                if rep.get("signals"):
+                    detail = (
+                        f"{t.metric}: {_signal_text(rep)} on this patient's own series "
+                        f"({t.readings_available} reading(s); method {rep.get('method_version')}). "
+                        "A statistical signal, not a diagnosis; thresholds are provisional."
+                    )
+                else:  # legacy structure without a report
+                    detail = (
                         f"Latest reading for {t.metric} is a statistical outlier vs this "
                         f"patient's own history (z-score {t.anomaly_z_score}, based on "
                         f"{t.readings_available} prior reading(s))"
-                    ),
+                    )
+                findings.append(AgentFinding(
+                    label=f"personal_anomaly:{t.metric}",
+                    detail=detail,
                     severity="high" if _anomaly_direction_adverse(t) is not False else "medium",
                     value=t.anomaly_z_score,
                 ))
+            elif rep.get("detection_status") == "insufficient_data":
+                insufficient.append(t.metric)
 
             if classification is not None or t.is_personal_anomaly:
                 trend_summaries.append({
@@ -165,6 +202,7 @@ class LongitudinalAgent(BaseNeuroAgent):
                     "is_personal_anomaly": t.is_personal_anomaly,
                     "anomaly_z_score": t.anomaly_z_score,
                     "readings_available": t.readings_available,
+                    "signal_text": _signal_text(t.anomaly_report) if t.anomaly_report else None,
                 })
 
         # Not a probability: share of tracked metrics that could be evaluated (coverage).
@@ -179,6 +217,9 @@ class LongitudinalAgent(BaseNeuroAgent):
         )
 
         warnings = ["confidence_is_metric_coverage_not_probability"]
+        if insufficient:
+            warnings.append(f"insufficient_history_for_personal_analysis:{sorted(insufficient)}")
+        warnings.extend(sorted(f"longitudinal_data_quality:{w}" for w in dq_warnings))
         if findings:
             narrative = await _explain_trends_with_gemini(trend_summaries)
             if narrative:
@@ -208,6 +249,8 @@ class LongitudinalAgent(BaseNeuroAgent):
                 "stable_metrics": stable,
                 "unclassified_metrics": unclassified,
                 "personal_anomalies": personal_anomalies,
+                "insufficient_history_metrics": insufficient,
+                "anomaly_reports": {t.metric: t.anomaly_report for t in trends if t.anomaly_report},
                 "narrative_source": narrative_source,
             },
         )

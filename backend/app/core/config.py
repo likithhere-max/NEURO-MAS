@@ -45,6 +45,16 @@ class Settings(BaseSettings):
     # Per-agent wall-clock limit (seconds). An agent that exceeds it is recorded as FAILED,
     # never allowed to stall the emergency path indefinitely.
     agent_timeout_seconds: float = 60.0
+    # Whole-workflow wall-clock budget (seconds). Each agent's timeout is min(agent_timeout_seconds, time left);
+    # agents that cannot finish inside the budget are recorded TIMED_OUT and the workflow returns a structured
+    # partial result instead of hanging.
+    workflow_deadline_seconds: float = 120.0
+    # Persist a finished workflow through ONE database transaction (RPC persist_workflow_atomic, see
+    # scripts/migration_phase2_persistence.sql). False = sequential inserts with an explicit persist_state marker.
+    # Only turn on after the migration has been applied to the target project.
+    persist_via_rpc: bool = False
+    # Max agents executing at the same time (bounds LLM/CPU fan-out).
+    max_agent_concurrency: int = 4
     # Hard limits on patient-supplied free text (abuse / cost / prompt-injection surface).
     max_free_text_chars: int = 5000
     max_chat_message_chars: int = 2000

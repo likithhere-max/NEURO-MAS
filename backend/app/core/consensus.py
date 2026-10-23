@@ -34,16 +34,22 @@ import math
 from dataclasses import dataclass, field
 
 from app.core.config import get_settings
-from app.schemas.agent import AgentResult
+from app.schemas.agent import EVIDENCE_ELIGIBLE_STATUSES, AgentResult
 
 
 @dataclass
 class HypothesisConsensus:
     hypothesis: str
     contributing_agents: list[str]
-    consensus_score: float
+    consensus_score: float          # legacy name. In evidence mode this is the UNCALIBRATED support index, not a probability
     per_agent_support: dict[str, float] = field(default_factory=dict)
     abstained_agents: list[str] = field(default_factory=list)
+    # --- evidence mode (compute_evidence_consensus) ---
+    status: str = "legacy"          # supported | contradicted | unsupported | legacy
+    contradiction_index: float = 0.0
+    independent_sources: int = 0
+    excluded_evidence: list[dict] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -55,6 +61,13 @@ class ConsensusOutcome:
     reason: str
     margin: float | None = None
     agent_level_support: bool = False
+    # Honest labelling: no probability is produced because voter reliability has never been validated.
+    score_kind: str = "legacy_weighted_mean"
+    calibrated: bool = False
+    probability: float | None = None
+    ties: list[str] = field(default_factory=list)
+    caveats: list[str] = field(default_factory=list)
+    non_voting_agents: dict[str, str] = field(default_factory=dict)
 
 
 def _evidence_strength(result: AgentResult) -> float:
@@ -137,3 +150,141 @@ def compute_consensus(
     return ConsensusOutcome(hypotheses=hypothesis_scores, disagreement=disagreement,
                             top_hypothesis=top.hypothesis if top else None, action_permitted=action_permitted,
                             reason=reason, margin=margin, agent_level_support=agent_level)
+
+
+# =============================================================================================================
+# Evidence-typed ranking (Phase 2, D2).  See docs/phase2/CONSENSUS_DESIGN.md.
+# =============================================================================================================
+SCORE_KIND = "uncalibrated_support_index"
+TIE_EPSILON = 0.02
+MIN_DATA_QUALITY_FOR_ACTION = 0.4
+
+
+def _key(name: str) -> str:
+    return " ".join(str(name).split()).casefold()
+
+
+def compute_evidence_consensus(
+    results: list[AgentResult],
+    reliability_weights: dict[str, float],
+    data_quality: float | None = None,
+    *,
+    tie_epsilon: float = TIE_EPSILON,
+) -> ConsensusOutcome:
+    """
+    Rank hypotheses from TYPED evidence. The output is an ordering plus an evidence summary, never a probability.
+
+      1. Only evidence from COMPLETED agents is considered; other statuses are listed in `non_voting_agents`.
+      2. Each item must pass `HypothesisEvidence.votes_for_ranking()` (type policy, scored, in-domain, validated if a
+         model); rejected items are kept in `excluded_evidence` with the reason.
+      3. Items sharing an `independence_group` are ONE observation (strongest kept): correlated evidence is not
+         double counted.
+      4. support_index(H)       = reliability-weighted mean over independent supporting groups, in [0, 1].
+         contradiction_index(H) = strongest independent contradicting group, in [0, 1].
+         rank_score(H)          = max(0, support_index - contradiction_index).
+         Weights are informal and unvalidated, so the number orders hypotheses; it does not quantify belief.
+      5. A hypothesis with no eligible support is "unsupported"; one whose contradiction >= support is "contradicted";
+         neither can be the top hypothesis.
+      6. Ties (|difference| <= tie_epsilon among the leaders) and a lone independent source are reported, and a tie
+         leaves `top_hypothesis=None`.
+      7. `disagreement` (kept for the safety gate) is 1 - top rank_score, and 1.0 whenever no unique supported leader
+         exists. `action_permitted` additionally requires adequate data quality.
+    """
+    settings = get_settings()
+    caveats: list[str] = []
+    non_voting: dict[str, str] = {}
+    names: dict[str, str] = {}
+    sup: dict[str, dict[str, list[tuple[float, float, str]]]] = {}   # key -> group -> [(strength, weight, agent)]
+    con: dict[str, dict[str, list[tuple[float, float, str]]]] = {}
+    excluded: dict[str, list[dict]] = {}
+
+    for r in results:
+        status = str(getattr(r.status, "value", r.status))
+        if status not in EVIDENCE_ELIGIBLE_STATUSES:
+            non_voting[r.agent_name] = status
+        for ev in r.hypothesis_evidence:
+            k = _key(ev.hypothesis)
+            names.setdefault(k, ev.hypothesis)
+            sup.setdefault(k, {})
+            con.setdefault(k, {})
+            excluded.setdefault(k, [])
+            if status not in EVIDENCE_ELIGIBLE_STATUSES:
+                excluded[k].append({"agent": ev.source_agent, "type": ev.evidence_type.value,
+                                    "reason": f"agent_status:{status}"})
+                continue
+            ok, why = ev.votes_for_ranking()
+            if not ok:
+                excluded[k].append({"agent": ev.source_agent, "type": ev.evidence_type.value, "reason": why})
+                continue
+            w = _clip01(reliability_weights.get(ev.source_agent, 0.5))
+            bucket = sup if ev.direction.value == "supports" else con
+            bucket[k].setdefault(ev.group, []).append((float(ev.strength), w, ev.source_agent))
+
+    hyps: list[HypothesisConsensus] = []
+    for k, name in names.items():
+        groups = sup.get(k, {})
+        sg = [(max(i[0] for i in items), max(i[1] for i in items), sorted({i[2] for i in items}))
+              for items in groups.values()]
+        wsum = sum(w for _, w, _ in sg)
+        support = (sum(s * w for s, w, _ in sg) / wsum) if wsum > 0 else 0.0
+        cgroups = con.get(k, {})
+        contra = max((max(i[0] for i in items) for items in cgroups.values()), default=0.0)
+        notes: list[str] = []
+        if not sg:
+            status = "unsupported"
+            notes.append("no eligible supporting evidence")
+        elif contra >= support:
+            status = "contradicted"
+            notes.append(f"contradicting evidence ({contra:.2f}) >= support index ({support:.2f})")
+        else:
+            status = "supported"
+        if len(sg) == 1:
+            notes.append("single independent source: not corroborated")
+        rank = max(0.0, support - contra) if status == "supported" else 0.0
+        agents = sorted({a for _, _, ags in sg for a in ags})
+        hyps.append(HypothesisConsensus(
+            hypothesis=name, contributing_agents=agents, consensus_score=round(rank, 3),
+            per_agent_support={a: round(max(i[0] for items in groups.values() for i in items if i[2] == a), 3) for a in agents},
+            abstained_agents=sorted(non_voting), status=status, contradiction_index=round(contra, 3),
+            independent_sources=len(sg), excluded_evidence=excluded.get(k, []), notes=notes,
+        ))
+
+    order = {"supported": 0, "contradicted": 1, "unsupported": 2}
+    hyps.sort(key=lambda h: (order.get(h.status, 3), -h.consensus_score, h.hypothesis.casefold()))
+    supported = [h for h in hyps if h.status == "supported"]
+    top = supported[0] if supported else None
+    ties: list[str] = []
+    if len(supported) > 1 and supported[0].consensus_score - supported[1].consensus_score <= tie_epsilon:
+        ties = [h.hypothesis for h in supported if supported[0].consensus_score - h.consensus_score <= tie_epsilon]
+        top = None
+        caveats.append(f"tie among {ties}: no unique leader (|difference| <= {tie_epsilon})")
+    margin = (round(supported[0].consensus_score - supported[1].consensus_score, 3) if len(supported) > 1 else None)
+
+    dq = None if data_quality is None else _clip01(data_quality)
+    low_dq = dq is not None and dq < MIN_DATA_QUALITY_FOR_ACTION
+    if low_dq:
+        caveats.append(f"low data quality ({dq}): ranking is weak evidence")
+    if non_voting:
+        caveats.append(f"agents not contributing evidence: {non_voting}")
+    if not hyps:
+        caveats.append("no agent supplied hypothesis-specific evidence")
+    elif top is None and not ties:
+        caveats.append("no hypothesis has eligible supporting evidence")
+    caveats.append("voter reliability is unvalidated: the index orders hypotheses, it is NOT a probability")
+
+    disagreement = round(1 - top.consensus_score, 3) if top else 1.0
+    action_permitted = bool(top) and not low_dq and disagreement <= settings.consensus_disagreement_threshold
+    if top is None:
+        reason = ("; ".join(c for c in caveats if "tie" in c or "no " in c)
+                  or "no unique supported hypothesis") + ": autonomous action NOT permitted."
+    else:
+        reason = (f"Leading hypothesis '{top.hypothesis}' (uncalibrated support index {top.consensus_score}, "
+                  f"{top.independent_sources} independent source(s), margin {margin}); "
+                  + ("within the disagreement threshold" if action_permitted else
+                     "autonomous action NOT permitted (disagreement/data-quality gate)"))
+    return ConsensusOutcome(
+        hypotheses=hyps, disagreement=disagreement, top_hypothesis=top.hypothesis if top else None,
+        action_permitted=action_permitted, reason=reason, margin=margin, agent_level_support=False,
+        score_kind=SCORE_KIND, calibrated=False, probability=None, ties=ties, caveats=caveats,
+        non_voting_agents=non_voting,
+    )
