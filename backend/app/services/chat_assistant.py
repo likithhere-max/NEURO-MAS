@@ -107,7 +107,10 @@ def _format_context(context: dict) -> str:
     else:
         lines.append("Candidate conditions considered: none matched.")
     if context.get("diagnostic_red_flags"):
-        lines.append(f"Red flags noted by the diagnostic agent: {context['diagnostic_red_flags']}")
+        lines.append(
+            "Generic warning signs to check for in the candidate conditions (knowledge-base checklist, NOT "
+            f"findings detected in this patient; never tell the patient they have these): {context['diagnostic_red_flags']}"
+        )
     if context.get("diagnostic_missing_information"):
         lines.append(f"Missing/limiting information noted: {context['diagnostic_missing_information']}")
 

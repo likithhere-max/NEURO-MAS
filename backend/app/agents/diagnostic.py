@@ -55,7 +55,14 @@ async def _explain_diagnosis_with_gemini(candidates: list[dict], red_flags: list
         f"matched symptoms: {', '.join(c['matched_terms']) or 'none'})"
         for c in candidates
     )
-    red_flag_line = f"Red flags noted: {', '.join(red_flags)}." if red_flags else "No red flags noted."
+    # These are the knowledge base's generic "warning signs to check for" for the candidate conditions. They
+    # are NOT findings detected in this patient, so the prompt must not let the model present them as such.
+    red_flag_line = (
+        "Generic warning signs a clinician should check for in these candidate conditions (taken from the "
+        "knowledge base; NOT findings reported or detected in this patient, so never say the patient has "
+        f"them): {', '.join(red_flags)}."
+        if red_flags else "No warning-sign checklist is listed for these candidates."
+    )
 
     prompt = (
         f"A symptom-retrieval heuristic (not you) produced these candidate neurological "

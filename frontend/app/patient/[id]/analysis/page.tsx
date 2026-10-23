@@ -77,7 +77,10 @@ export default function AnalysisPage() {
           <div className="text-xs text-neuro-warn mt-3">⚠ {diagPayload.missing_information.join(" ")}</div>
         )}
         {diagPayload.red_flags?.length > 0 && (
-          <div className="text-xs text-neuro-critical mt-2">Red flags noted: {diagPayload.red_flags.join(", ")}</div>
+          <div className="text-xs text-neuro-warn mt-2">
+            Warning signs to check for in these conditions (a general checklist from the knowledge base, not findings
+            detected in this patient): {diagPayload.red_flags.join(", ")}
+          </div>
         )}
       </div>
 
