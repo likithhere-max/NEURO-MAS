@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 from pathlib import Path
 
 import joblib
@@ -31,6 +32,8 @@ from app.schemas.ml_demo import (
 )
 from app.ml.ood import InputDomain
 from app.services.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/demo", tags=["ml-demo"])
 
@@ -76,7 +79,12 @@ def _verified_load(path):
     actual = hashlib.sha256(path.read_bytes()).hexdigest()
     if not expected or not hmac.compare_digest(expected, actual):
         raise HTTPException(503, "Model artifact failed integrity verification and was not loaded.")
-    return joblib.load(path)
+    from app.ml.safe_load import UnsafeModelError, restricted_joblib_load
+    try:
+        return restricted_joblib_load(path)
+    except UnsafeModelError as exc:
+        logger.error("model_artifact_rejected name=%s reason=%s", path.name, exc)
+        raise HTTPException(503, "Model artifact failed safe-loading checks and was not loaded.")
 
 
 METRICS_STATUS = ("NOT_INDEPENDENTLY_VALIDATED: the performance figures in this metadata were produced by a procedure that "
