@@ -90,6 +90,11 @@ class Settings(BaseSettings):
     # ENVIRONMENT=development. Default False: signup goes through Supabase's email-confirmation flow.
     auto_confirm_email: bool = False
     auth_rate_limit_per_minute: int = 10
+    # --- Change-classification thresholds (app/core/metric_semantics.py). PROVISIONAL conventions, not clinical standards.
+    metric_stable_band: float = 0.05
+    metric_adverse_threshold: float = 0.20
+    # Path to a JSON file of clinician-approved MCIDs (see metric_semantics.py). Empty = none; unapproved entries are ignored.
+    metric_mcid_path: str = ""
     # Per-authenticated-user limits for expensive endpoints (0 disables).
     workflow_rate_limit_per_minute: int = 6
     chat_rate_limit_per_minute: int = 20
@@ -113,6 +118,8 @@ class Settings(BaseSettings):
                              "(it disables email verification)")
         if self.notification_channel.lower() == "smtp" and not (self.smtp_host and self.smtp_from):
             raise ValueError("NOTIFICATION_CHANNEL=smtp requires SMTP_HOST and SMTP_FROM")
+        if not (0.0 <= self.metric_stable_band < self.metric_adverse_threshold <= 10.0):
+            raise ValueError("require 0 <= METRIC_STABLE_BAND < METRIC_ADVERSE_THRESHOLD <= 10")
         return self
 
 
