@@ -192,3 +192,8 @@ Phase 3 ended at 714 passed / 26 skipped; Phase 4A adds 50 tests (`tests/phase4/
 The warnings are scikit-learn `InconsistentVersionWarning` (artifacts trained under 1.9.0, loaded under 1.9.1) and small-class fold warnings from synthetic fixtures.
 
 **Nothing in this report claims or supports clinical validity, clinical usefulness or readiness for patients.**
+
+
+---
+
+**Later note (Phase 5, 2026-10-23).** This report is preserved unchanged as historical evidence. Phase 5 re-audited it in `docs/phase5/` (start at `FINAL_READINESS_REPORT.md`). Items resolved since: the single `test_time` convention is enforced (E02), provenance sidecars exist for the shipped artifacts, the registered workflow and dataset manifest exist. Items still open because the data cannot be downloaded here: reproduction of every figure above, the 5,801 vs 5,833 and 31 vs 32 discrepancies, and all real-data results (`NOT_RUN`). The 764 passed / 26 skipped result quoted historically is unchanged; the Phase 5 regression is recorded separately.

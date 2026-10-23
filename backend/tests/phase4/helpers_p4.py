@@ -61,5 +61,8 @@ def make_artifact_dir(tmp: Path, kind: str, raw: pd.DataFrame) -> Path:
     jl = tmp / f"{stem}.joblib"
     joblib.dump(pipe, jl)
     (tmp / f"{stem}_metadata.json").write_text(json.dumps({"feature_columns_in_order": feats}))
-    (tmp / "MANIFEST.json").write_text(json.dumps({"sha256": {jl.name: F._sha256(jl)}}))
+    man = tmp / "MANIFEST.json"
+    shas = json.loads(man.read_text())["sha256"] if man.exists() else {}
+    shas[jl.name] = F._sha256(jl)
+    man.write_text(json.dumps({"sha256": shas}))
     return tmp

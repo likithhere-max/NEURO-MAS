@@ -116,7 +116,7 @@ def _voice_constraints():
 
 
 def _risk_constraints():
-    bounds = [Bound("test_time", lo=0.0, why="days since baseline visit cannot be negative"),
+    bounds = [Bound("test_time", lo=0.0, why="serving convention is days since RECRUITMENT (app.ml.contract); negative values abstain (conservative engineering bound)"),
               Bound("baseline_total_UPDRS", lo=0.0, hi=176.0, why="total UPDRS scale range")]
     # Deltas of linear identities remain linear identities
     ids = [Identity("delta_Jitter:DDP", "delta_Jitter:RAP", 3.0, 1e-4, 0.05, "DDP = 3 x RAP => same for differences"),

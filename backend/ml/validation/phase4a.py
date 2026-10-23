@@ -304,7 +304,10 @@ def noskill_metrics(y, oof, thr: float) -> dict:
 
 
 # ------------------------------------------------------------------------------------------------ the two protocols
-def run_risk(df: pd.DataFrame, delta_cols: list[str], info: dict, *, seeds: list[int], n_boot: int, fast: bool, evidence: str) -> dict:
+def run_risk(df: pd.DataFrame, delta_cols: list[str], info: dict, *, seeds: list[int], n_boot: int, fast: bool, evidence: str,
+             recorder=None) -> dict:
+    """`recorder(tag, seed, y, groups, nested_result)` is called after every nested fit (fold assignments / held-out predictions can be saved);
+    it observes only and never changes the computation."""
     t0 = time.time()
     y, g = df["worsening"].reset_index(drop=True), df["subject#"].astype(str).reset_index(drop=True)
     thr = PROTOCOL["threshold"]
@@ -328,6 +331,8 @@ def run_risk(df: pd.DataFrame, delta_cols: list[str], info: dict, *, seeds: list
             res = nested_group_cv(df[cols].reset_index(drop=True), y, g, cands, outer=PROTOCOL["risk"]["outer"], inner_k=PROTOCOL["inner_k"],
                                   seed=seed, group_level_target=False, check_duplicates=name in ("FULL", "VOICE_ONLY"))
             preds[name] = res.oof
+            if recorder:
+                recorder(("risk", name), seed, y, g, res)
             frame = pd.DataFrame({"subject": g, "y": y, "p": res.oof})
             first = seed == seeds[0]
             per_seed[seed][name] = {
@@ -378,7 +383,8 @@ def run_risk(df: pd.DataFrame, delta_cols: list[str], info: dict, *, seeds: list
         runtime_seconds=round(time.time() - t0, 1))
 
 
-def run_disease(df: pd.DataFrame, info: dict, *, seeds: list[int], n_boot: int, n_perm: int, fast: bool, evidence: str) -> dict:
+def run_disease(df: pd.DataFrame, info: dict, *, seeds: list[int], n_boot: int, n_perm: int, fast: bool, evidence: str,
+                recorder=None) -> dict:
     t0 = time.time()
     X = df[D.DISEASE_FEATURES].reset_index(drop=True)
     y, g = df["status"].reset_index(drop=True), df["subject"].reset_index(drop=True)
@@ -387,6 +393,8 @@ def run_disease(df: pd.DataFrame, info: dict, *, seeds: list[int], n_boot: int, 
     per_seed: dict = {}
     for seed in seeds:
         nested = nested_group_cv(X, y, g, cands, outer="logo", inner_k=PROTOCOL["inner_k"], seed=seed)
+        if recorder:
+            recorder(("disease", "candidates"), seed, y, g, nested)
         rec = pd.DataFrame({"subject": g, "y": y, "p": nested.oof})
         subj = aggregate_by_group(g, y, nested.oof, "mean").rename(columns={"group": "subject"})
         entry = {"recording_level": full_metrics(rec, thr, n_boot, seed) if seed == seeds[0] else evaluate_binary(rec["y"], rec["p"], thr),
@@ -408,6 +416,8 @@ def run_disease(df: pd.DataFrame, info: dict, *, seeds: list[int], n_boot: int, 
         for bname, fac in bases.items():
             r = nested_group_cv(X, y, g, {bname: fac}, outer="logo", inner_k=PROTOCOL["inner_k"], seed=seed)
             base_oof[bname] = r.oof
+            if recorder:
+                recorder(("disease", bname), seed, y, g, r)
             s2 = aggregate_by_group(g, y, r.oof, "mean").rename(columns={"group": "subject"})
             rr = pd.DataFrame({"subject": g, "y": y, "p": r.oof})
             ev = noskill_metrics if bname == "dummy_prior" else evaluate_binary

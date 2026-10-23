@@ -1,0 +1,250 @@
+{
+  "contract_version": "1.0.0",
+  "model_id": "parkinsons_demo_classifier",
+  "model_version": "legacy-unversioned",
+  "dataset_manifest": {
+    "dataset_sha256": null,
+    "manifest_status": "UNPINNED_NO_ACCESS (ml/data/DATASET_MANIFEST.json)",
+    "rows": 195,
+    "subjects": 32
+  },
+  "protocol_version": null,
+  "training_code_revision": null,
+  "runtime_versions": {
+    "trained_with_scikit-learn": "1.9.0",
+    "trained_with_scikit-learn_basis": "inferred from the InconsistentVersionWarning raised on unpickling (MANIFEST.json)"
+  },
+  "feature_schema": {
+    "order": [
+      "MDVP:Fo(Hz)",
+      "MDVP:Fhi(Hz)",
+      "MDVP:Flo(Hz)",
+      "MDVP:Jitter(%)",
+      "MDVP:Jitter(Abs)",
+      "MDVP:RAP",
+      "MDVP:PPQ",
+      "Jitter:DDP",
+      "MDVP:Shimmer",
+      "MDVP:Shimmer(dB)",
+      "Shimmer:APQ3",
+      "Shimmer:APQ5",
+      "MDVP:APQ",
+      "Shimmer:DDA",
+      "NHR",
+      "HNR",
+      "RPDE",
+      "DFA",
+      "spread1",
+      "spread2",
+      "D2",
+      "PPE"
+    ],
+    "count": 22
+  },
+  "feature_units": {
+    "MDVP:Fo(Hz)": {
+      "unit": "Hz",
+      "status": "from_feature_name",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:Fhi(Hz)": {
+      "unit": "Hz",
+      "status": "from_feature_name",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:Flo(Hz)": {
+      "unit": "Hz",
+      "status": "from_feature_name",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:Jitter(%)": {
+      "unit": "percent",
+      "status": "from_feature_name",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:Jitter(Abs)": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:RAP": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:PPQ": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "Jitter:DDP": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:Shimmer": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:Shimmer(dB)": {
+      "unit": "dB",
+      "status": "from_feature_name",
+      "is_delta_vs_first_visit": false
+    },
+    "Shimmer:APQ3": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "Shimmer:APQ5": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "MDVP:APQ": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "Shimmer:DDA": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "NHR": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "HNR": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "RPDE": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "DFA": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "spread1": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "spread2": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "D2": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    },
+    "PPE": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": false
+    }
+  },
+  "preprocessing": {
+    "scaler": "StandardScaler",
+    "n_samples_seen": 195,
+    "mean": [
+      154.22864102564102,
+      197.10491794871797,
+      116.32463076923077,
+      0.006220461538461538,
+      4.395897435897436e-05,
+      0.003306410256410257,
+      0.003446358974358974,
+      0.009919948717948717,
+      0.0297091282051282,
+      0.2822512820512821,
+      0.015664153846153845,
+      0.017878256410256407,
+      0.02408148717948718,
+      0.04699261538461539,
+      0.02484707692307692,
+      21.885974358974355,
+      0.4985355384615385,
+      0.7180990461538461,
+      -5.684396743589745,
+      0.22651034871794873,
+      2.3818260871794874,
+      0.20655164102564103
+    ],
+    "scale": [
+      41.283799965906525,
+      91.25665238831346,
+      43.40967637841882,
+      0.004835686602250747,
+      3.47325068897351e-05,
+      0.00296015495711816,
+      0.002751893254928691,
+      0.008880485924417673,
+      0.018808518603560635,
+      0.19437696243124433,
+      0.01012709438557181,
+      0.011992835897206745,
+      0.016903227224669554,
+      0.030380918738842865,
+      0.04031467829869681,
+      4.414401569264757,
+      0.10367485434733356,
+      0.05519376122810949,
+      1.0874087661470229,
+      0.08319162680463385,
+      0.3818162489128301,
+      0.08988795028412536
+    ]
+  },
+  "target_definition": "status = 1 for a subject with Parkinson's disease, 0 for a healthy subject; constant within a subject.",
+  "prediction_horizon": "CROSS-SECTIONAL: classifies the voice recording itself; no time dimension.",
+  "training_date": null,
+  "random_seeds": {
+    "estimator_random_state": 42,
+    "basis": "estimator random_state=42 appears in the superseded training script; the cross-validation splitters (LeaveOneGroupOut / GroupKFold) are deterministic. Read from source code, not recorded in the artifact."
+  },
+  "validation_pointer": {
+    "metadata_key": "loso_metrics",
+    "caveat": "historical, model selection on the scoring folds, no confidence interval, not reproduced from data",
+    "registered_protocol_results": "NOT_RUN (data inaccessible): ml/validation/results/phase4a/*_NOT_RUN.json"
+  },
+  "calibration": {
+    "calibrated": false,
+    "parameters": null,
+    "note": "class-weighted / tree scores; no recalibration fitted"
+  },
+  "decision_threshold": {
+    "value": 0.5,
+    "rationale": null,
+    "note": "the estimator's own predict() rule (about 0.5 on predict_proba); no rationale was recorded"
+  },
+  "known_limitations": [
+    "Research demonstration on a small public dataset. Not clinically validated; not for diagnosis, monitoring or any decision about a patient.",
+    "No external validation.",
+    "Scores are uncalibrated.",
+    "Model selection used the same folds that produced the reported score (optimistic)."
+  ],
+  "artifact_checksum": {
+    "file": "parkinsons_demo_classifier.joblib",
+    "sha256": "048678799e7bbe4e2d4d4b4113eb01b6c1029fd80460f20b2fab23b59cc1cd04",
+    "verified_against_manifest": true
+  },
+  "training_script_superseded": "ml/training/train_parkinsons_classifier.py",
+  "artifact_first_committed_in": "156207c8b8d21830b95bae4c368a74646c42f89e",
+  "unrecoverable": {
+    "dataset_manifest": "the dataset file was never pinned; no SHA-256 of the training data is recorded anywhere",
+    "protocol_version": "the artifact predates the registered protocols",
+    "training_code_revision": "no git revision was recorded at training time (artifact_first_committed_in is the commit that added the file, not necessarily the training revision)",
+    "training_date": "not recorded in the artifact or its metadata",
+    "decision_threshold.rationale": "not recorded"
+  }
+}

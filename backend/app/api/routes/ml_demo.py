@@ -103,8 +103,25 @@ def _domain_for(stem: str, kind: str, model, metadata) -> InputDomain:
         if fitted.exists():
             _domains[stem] = InputDomain.from_json(fitted.read_text())
         else:
-            _domains[stem] = InputDomain.from_scaler(kind, metadata["feature_columns_in_order"], model.named_steps["scaler"])
+            _domains[stem] = InputDomain.from_scaler(kind, metadata["feature_columns_in_order"], _scaler_of(model))
     return _domains[stem]
+
+
+def _scaler_of(model):
+    """The pipeline's StandardScaler (found by type). No scaler -> no provisional domain can be derived -> serving must abstain."""
+    from sklearn.preprocessing import StandardScaler
+    for step in getattr(model, "named_steps", {}).values():
+        if isinstance(step, StandardScaler):
+            return step
+    raise HTTPException(503, "This model has no fitted input-domain file and no scaler to derive a provisional domain from; "
+                             "refusing to serve predictions without an input-domain check.")
+
+
+def _provenance(kind: str) -> dict:
+    """Provenance-completeness report of the artifact (ml/validation/artifact_contract.py). Never raises; INVALID if the sidecar is absent."""
+    from ml.validation.artifact_contract import load_sidecar_report
+    rep = load_sidecar_report(kind, MODEL_DIR)
+    return {**rep, "note": "INCOMPLETE_DECLARED/INVALID means the data, code or date behind this model cannot be traced; see the sidecar"}
 
 
 def _version_info() -> dict:
@@ -171,7 +188,7 @@ def classify_parkinsons_voice_sample(payload: ParkinsonsVoiceFeaturesIn, user: d
 def parkinsons_classifier_info(user: dict = Depends(get_current_user)):
     """Returns the model's training metadata (dataset, metrics, thresholds) for transparency."""
     _, metadata = _load_model()
-    return {**metadata, "runtime": _version_info(), "metrics_status": METRICS_STATUS}
+    return {**metadata, "runtime": _version_info(), "metrics_status": METRICS_STATUS, "provenance": _provenance("disease")}
 
 
 @router.post("/parkinsons-risk-classifier", response_model=ParkinsonsRiskPredictionOut)
@@ -200,4 +217,4 @@ def classify_parkinsons_risk_trend(payload: ParkinsonsRiskFeaturesIn, user: dict
 def parkinsons_risk_classifier_info(user: dict = Depends(get_current_user)):
     """Returns the model's training metadata (dataset, metrics, thresholds) for transparency."""
     _, metadata = _load_risk_model()
-    return {**metadata, "runtime": _version_info(), "metrics_status": METRICS_STATUS}
+    return {**metadata, "runtime": _version_info(), "metrics_status": METRICS_STATUS, "provenance": _provenance("risk")}

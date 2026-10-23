@@ -1,0 +1,49 @@
+{
+  "amendment_rule": "Never edit this file. A change is a NEW file (p4a-2.json) stating the defect, rationale, changed estimand or procedure, and whether the resulting analysis is exploratory or confirmatory.",
+  "frozen_before_any_real_result": true,
+  "frozen_on": "2026-10-23",
+  "protocol": {
+    "default_seeds": 5,
+    "disease": {
+      "baselines": [
+        "dummy_prior",
+        "classic3_LR"
+      ],
+      "outer": "logo",
+      "target": "status (0 healthy / 1 PD), group-level",
+      "unit": "subject (parsed from the recording name)"
+    },
+    "id": "p4a-1",
+    "inner_k": 5,
+    "interpretation_rule": "voice adds measurable information ONLY IF the 95% cluster-bootstrap interval of AUC(FULL) - AUC(reference) excludes 0 for every reference set AND the effect is reproduced for every seed; otherwise the data cannot show that it does. Neither outcome is evidence of clinical usefulness.",
+    "n_boot": 2000,
+    "n_perm": 200,
+    "reference_for_voice_value": [
+      "TIME_BASELINE",
+      "TIME_BASELINE_DEMOGRAPHIC"
+    ],
+    "risk": {
+      "feature_sets": {
+        "BASELINE_ONLY": "baseline_total_UPDRS",
+        "DEMOGRAPHIC_ONLY": "age + sex",
+        "FULL": "voice deltas + test_time + baseline_total_UPDRS",
+        "TIME_BASELINE": "test_time + baseline_total_UPDRS",
+        "TIME_BASELINE_DEMOGRAPHIC": "test_time + baseline_total_UPDRS + age + sex",
+        "TIME_DEMOGRAPHIC": "test_time + age + sex",
+        "TIME_ONLY": "test_time",
+        "VOICE_ONLY": "voice deltas"
+      },
+      "outer": 10,
+      "target": "total_UPDRS(t) - total_UPDRS(first visit) >= threshold, concurrent, row-level",
+      "unit": "patient (subject#)",
+      "worsening_threshold_points": 3.0
+    },
+    "seed_base": 20261023,
+    "selection_metric": "roc_auc",
+    "threshold": 0.5
+  },
+  "protocol_id": "p4a-1",
+  "registry_schema": "neuro-mas-protocol/1",
+  "sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+  "status": "FROZEN"
+}

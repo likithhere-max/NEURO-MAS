@@ -27,6 +27,11 @@ ALLOWED_EXACT = {
     ("numpy.core.multiarray", "_reconstruct"), ("numpy.core.multiarray", "scalar"),
     ("numpy.random._pickle", "__randomstate_ctor"), ("numpy.random._pickle", "__generator_ctor"),
     ("numpy.random._pickle", "__bit_generator_ctor"),
+    # Phase 5 (E06): a fitted HistGradientBoostingClassifier stores a numpy Generator, whose state pickles as these three names.
+    # They are inert numeric-state classes; added as EXACT names (no prefix widening). Without them a retrained model whose winner is
+    # the boosting candidate could not be loaded at all.
+    ("numpy.random._pcg64", "PCG64"), ("numpy.random.bit_generator", "SeedSequence"),
+    ("numpy.random.bit_generator", "__pyx_unpickle_SeedSequence"),
 }
 # scikit-learn / scipy.sparse are allowed by prefix, minus modules that perform I/O or are test helpers.
 ALLOWED_PREFIXES = ("sklearn.", "scipy.sparse")

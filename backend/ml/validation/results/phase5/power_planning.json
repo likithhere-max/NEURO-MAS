@@ -1,0 +1,209 @@
+{
+  "task": "power_planning",
+  "status": "completed",
+  "evidence_status": "DESIGN_STAGE_PLANNING_NOT_EVIDENCE",
+  "clinically_validated": false,
+  "protocol_id": "p4a-1",
+  "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+  "analytic_disease_precision": {
+    "independent_units": {
+      "pd_subjects": 24,
+      "healthy_subjects": 8
+    },
+    "assumptions": [
+      "one independent score per subject (subject-level aggregation)",
+      "scores treated as fixed: training variability, model selection and repeated recordings are ignored, so every number here is OPTIMISTIC",
+      "normal approximation (Hanley-McNeil); poor with 8 healthy subjects"
+    ],
+    "se_under_null": 0.11967838846954226,
+    "minimum_detectable_auc_vs_0_5_at_80pct_power": 0.8352891779604426,
+    "reading": "with 24 PD and 8 healthy subjects an AUC below about 0.84 cannot be reliably distinguished from 0.5, even optimistically",
+    "precision_at_assumed_true_auc": [
+      {
+        "true_auc": 0.6,
+        "se": 0.11289612798624105,
+        "ci95_half_width": 0.22127234659242495,
+        "ci95": [
+          0.378727653407575,
+          0.821272346592425
+        ]
+      },
+      {
+        "true_auc": 0.7,
+        "se": 0.10025772783656246,
+        "ci95_half_width": 0.1965015372814603,
+        "ci95": [
+          0.5034984627185397,
+          0.8965015372814602
+        ]
+      },
+      {
+        "true_auc": 0.8,
+        "se": 0.0813656584215378,
+        "ci95_half_width": 0.1594737613425109,
+        "ci95": [
+          0.6405262386574891,
+          0.959473761342511
+        ]
+      },
+      {
+        "true_auc": 0.9,
+        "se": 0.05480091196461148,
+        "ci95_half_width": 0.10740781461780778,
+        "ci95": [
+          0.7925921853821922,
+          1.0
+        ]
+      }
+    ]
+  },
+  "prevalence_sensitivity": {
+    "evidence_status": "ARITHMETIC_ON_HISTORICAL_UNVERIFIED_FIGURES",
+    "operating_points": {
+      "disease_RandomForest_Top10Features": {
+        "sensitivity": 0.8843537414965986,
+        "specificity": 0.4375,
+        "by_prevalence": [
+          {
+            "prevalence": 0.01,
+            "ppv": 0.015632398145155837,
+            "npv": 0.9973370666614453
+          },
+          {
+            "prevalence": 0.05,
+            "ppv": 0.07642282397031268,
+            "npv": 0.9862785653029309
+          },
+          {
+            "prevalence": 0.1,
+            "ppv": 0.1487095159791235,
+            "npv": 0.9714675338298542
+          },
+          {
+            "prevalence": 0.25,
+            "ppv": 0.34385848900644733,
+            "npv": 0.9190235189044359
+          },
+          {
+            "prevalence": 0.5,
+            "ppv": 0.6112253893623273,
+            "npv": 0.7909300538047656
+          },
+          {
+            "prevalence": 0.75,
+            "ppv": 0.8250694168980564,
+            "npv": 0.5577235772357724
+          }
+        ]
+      },
+      "risk_LogisticRegression": {
+        "sensitivity": 0.5981941309255079,
+        "specificity": 0.6503067484662577,
+        "by_prevalence": [
+          {
+            "prevalence": 0.01,
+            "ppv": 0.016985549601186613,
+            "npv": 0.9937975859026016
+          },
+          {
+            "prevalence": 0.05,
+            "ppv": 0.08259650759899344,
+            "npv": 0.9685046720855912
+          },
+          {
+            "prevalence": 0.1,
+            "ppv": 0.159712927152122,
+            "npv": 0.9357579998051528
+          },
+          {
+            "prevalence": 0.25,
+            "ppv": 0.36314187712277635,
+            "npv": 0.8292168958372574
+          },
+          {
+            "prevalence": 0.5,
+            "ppv": 0.6310814364608597,
+            "npv": 0.6180961406834097
+          },
+          {
+            "prevalence": 0.75,
+            "ppv": 0.8369177710609935,
+            "npv": 0.3504328358208955
+          }
+        ]
+      }
+    },
+    "reading": "PPV collapses as prevalence falls; the historical operating points say nothing about any real screening population"
+  },
+  "risk_voice_value_simulation": {
+    "design": {
+      "patients": 42,
+      "sessions_per_patient": 139,
+      "outer": 5,
+      "inner": 3,
+      "n_boot": 200,
+      "candidates": "LR_C0.1, LR_C1",
+      "note": "a lighter configuration than the registered 10-fold/5-seed protocol; single-seed per repetition"
+    },
+    "rows": [
+      {
+        "voice_signal_generator_units": 0.0,
+        "reps": 20,
+        "mean_auc_difference_full_minus_time_baseline": -0.007650822017573222,
+        "sd_auc_difference": 0.014755501558291629,
+        "detection_rate_interval_above_0": 0.0,
+        "interval_below_0_rate": 0.3,
+        "seconds": 71.9
+      },
+      {
+        "voice_signal_generator_units": 0.25,
+        "reps": 20,
+        "mean_auc_difference_full_minus_time_baseline": 0.0007372149002256745,
+        "sd_auc_difference": 0.017664644185992853,
+        "detection_rate_interval_above_0": 0.0,
+        "interval_below_0_rate": 0.05,
+        "seconds": 64.8
+      },
+      {
+        "voice_signal_generator_units": 0.5,
+        "reps": 20,
+        "mean_auc_difference_full_minus_time_baseline": 0.026603960223511976,
+        "sd_auc_difference": 0.021348414713704085,
+        "detection_rate_interval_above_0": 0.2,
+        "interval_below_0_rate": 0.0,
+        "seconds": 66.6
+      },
+      {
+        "voice_signal_generator_units": 1.0,
+        "reps": 20,
+        "mean_auc_difference_full_minus_time_baseline": 0.08110215084091675,
+        "sd_auc_difference": 0.03741881011082997,
+        "detection_rate_interval_above_0": 0.8,
+        "interval_below_0_rate": 0.0,
+        "seconds": 98.9
+      },
+      {
+        "voice_signal_generator_units": 2.0,
+        "reps": 20,
+        "mean_auc_difference_full_minus_time_baseline": 0.15780609854614505,
+        "sd_auc_difference": 0.029775614911757498,
+        "detection_rate_interval_above_0": 1.0,
+        "interval_below_0_rate": 0.0,
+        "seconds": 127.0
+      }
+    ],
+    "smallest_tested_effect_with_80pct_detection": {
+      "voice_signal_generator_units": 1.0,
+      "mean_auc_difference_full_minus_time_baseline": 0.08110215084091675
+    },
+    "caveats": [
+      "the generator's voice effect is arbitrary: the transferable quantity is the AUC difference, not the generator unit",
+      "real labels derive from interpolated UPDRS, real voice is correlated within patient, and the real noise structure is unknown: real power can be lower or higher",
+      "20 repetitions per level: detection rates carry roughly +/-22 points of Monte-Carlo error"
+    ]
+  },
+  "multiplicity": {
+    "registered_voice_rule": "two reference models (TIME_BASELINE, TIME_BASELINE_DEMOGRAPHIC) x every seed must all exclude 0: an intersection rule, which is conservative against false positives but costs power",
+    "not_adjusted": "feature-set comparisons beyond the registered rule, subgroup analyses and any additional endpoint are exploratory"
+  }
+}

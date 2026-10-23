@@ -1,0 +1,59 @@
+{
+  "manifest_version": "1.0.0",
+  "manifest_schema": "neuro-mas-dataset-manifest/1",
+  "created_utc": "2026-10-23",
+  "overall_status": "UNPINNED_NO_ACCESS",
+  "overall_status_meaning": "No dataset file has ever been retrieved by this project. No SHA-256 is recorded below because none can be honestly computed. A run on any file is therefore 'authenticated' only through the artifact fingerprint (ml/validation/fingerprint.py), never through this manifest, until a human pins the hashes with `python -m ml.validation.dataset_manifest pin`.",
+  "datasets": {
+    "parkinsons": {
+      "role": "disease classifier training data",
+      "file_name": "parkinsons.data",
+      "url": "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data",
+      "landing_page": "https://archive.ics.uci.edu/dataset/174",
+      "doi": "10.24432/C59C74",
+      "license_per_publisher_page": "CC BY 4.0",
+      "publisher_stated_not_hash_verified": {"recordings": 195, "subjects": 31, "pd_subjects": 23, "pd_recordings": 147, "healthy_recordings": 48, "missing_values": false},
+      "expected_structure_enforced_by_code": {"rows": 195, "pd_rows": 147, "healthy_rows": 48, "n_columns": 24, "subject_id_rule": "S-code in recording name", "no_missing_values": true},
+      "shipped_artifact_facts": {"training_rows": 195, "metadata_subjects": 32, "features": 22},
+      "sha256": null,
+      "bytes": null,
+      "retrieved_utc": null,
+      "pin_status": "NOT_PINNED",
+      "access_attempts": [
+        {"phase": "2", "method": "urllib download via the session proxy (ml.validation.validate_models fetch)", "outcome": "HTTP 403 (Tunnel connection failed: 403 Forbidden)", "record": "ml/validation/results/fetch_FAILED.json"},
+        {"phase": "4A", "method": "reconfirmed; GitHub API access is bound to the session's configured repositories; no authorised mirror located", "outcome": "not retrieved"},
+        {"phase": "5", "method": "not retried: the proxy policy states a 403 denial is not to be retried or worked around", "outcome": "not retrieved"}
+      ]
+    },
+    "parkinsons_updrs": {
+      "role": "risk classifier training data",
+      "file_name": "parkinsons_updrs.data",
+      "url": "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/telemonitoring/parkinsons_updrs.data",
+      "landing_page": "https://archive.ics.uci.edu/dataset/189",
+      "doi": "10.24432/C5ZS3N",
+      "license_per_publisher_page": "CC BY 4.0",
+      "publisher_stated_not_hash_verified": {"instances": 5875, "subjects": 42, "missing_values": false,
+                                             "test_time": "time since recruitment into the trial; integer part is days since recruitment",
+                                             "total_UPDRS": "clinician's score, linearly interpolated"},
+      "expected_structure_enforced_by_code": {"rows": 5875, "subjects": 42, "n_columns": 22, "no_missing_values": true},
+      "shipped_artifact_facts": {"training_rows_after_baseline_exclusion": 5801, "metadata_subjects": 42, "features": 18},
+      "sha256": null,
+      "bytes": null,
+      "retrieved_utc": null,
+      "pin_status": "NOT_PINNED",
+      "access_attempts": [
+        {"phase": "2", "method": "urllib download via the session proxy (ml.validation.validate_models fetch)", "outcome": "HTTP 403 (Tunnel connection failed: 403 Forbidden)", "record": "ml/validation/results/fetch_FAILED.json"},
+        {"phase": "4A", "method": "reconfirmed; no authorised mirror located", "outcome": "not retrieved"},
+        {"phase": "5", "method": "not retried: the proxy policy states a 403 denial is not to be retried or worked around", "outcome": "not retrieved"}
+      ]
+    }
+  },
+  "how_to_pin": [
+    "On a machine with legitimate access, download both files from the URLs above.",
+    "cd backend && PYTHONPATH=. python -m ml.validation.phase4a authenticate --kind disease --csv parkinsons.data   (must exit 0)",
+    "cd backend && PYTHONPATH=. python -m ml.validation.phase4a authenticate --kind risk --csv parkinsons_updrs.data (must exit 0)",
+    "cd backend && PYTHONPATH=. python -m ml.validation.dataset_manifest pin --name parkinsons --csv parkinsons.data",
+    "cd backend && PYTHONPATH=. python -m ml.validation.dataset_manifest pin --name parkinsons_updrs --csv parkinsons_updrs.data",
+    "Commit the updated manifest. A pin is refused for any file that does not first authenticate as the shipped training matrix."
+  ]
+}

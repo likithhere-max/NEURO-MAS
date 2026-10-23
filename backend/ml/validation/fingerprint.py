@@ -65,14 +65,37 @@ def load_artifact(kind: str, models_dir: Path = MODELS):
     return restricted_joblib_load(jl), meta
 
 
+def find_scaler(model):
+    """The pipeline's StandardScaler, found BY TYPE (retrained pipelines name their steps 's'/'c'/'k', the legacy ones 'scaler'); None if the
+    pipeline has no scaler (e.g. a gradient-boosting winner)."""
+    from sklearn.preprocessing import StandardScaler
+    steps = getattr(model, "named_steps", None) or {}
+    named = steps.get("scaler")
+    if isinstance(named, StandardScaler):
+        return named
+    for step in steps.values():
+        if isinstance(step, StandardScaler):
+            return step
+    return None
+
+
 def artifact_fingerprint(kind: str, models_dir: Path = MODELS) -> dict:
+    """Training-matrix moments of the shipped artifact: from its StandardScaler if it has one, otherwise from the provenance sidecar
+    (`<stem>_provenance.json`, `preprocessing`), which new artifacts compute directly from the training matrix."""
     model, meta = load_artifact(kind, models_dir)
-    sc = model.named_steps["scaler"]
     feats = list(meta["feature_columns_in_order"])
-    if len(feats) != len(sc.mean_):
-        raise FingerprintError("metadata feature list and scaler dimension disagree")
-    return {"n": int(sc.n_samples_seen_), "features": feats, "mean": [float(v) for v in sc.mean_],
-            "scale": [float(v) for v in sc.scale_]}
+    sc = find_scaler(model)
+    if sc is not None:
+        n, mean, scale = int(sc.n_samples_seen_), [float(v) for v in sc.mean_], [float(v) for v in sc.scale_]
+    else:
+        side = Path(models_dir) / f"{STEMS[kind]}_provenance.json"
+        if not side.exists():
+            raise FingerprintError("the pipeline has no StandardScaler and there is no provenance sidecar: the training matrix cannot be fingerprinted")
+        pre = json.loads(side.read_text())["preprocessing"]
+        n, mean, scale = int(pre["n_samples_seen"]), [float(v) for v in pre["mean"]], [float(v) for v in pre["scale"]]
+    if len(feats) != len(mean) or len(feats) != len(scale):
+        raise FingerprintError("metadata feature list and fingerprint dimension disagree")
+    return {"n": n, "features": feats, "mean": mean, "scale": scale}
 
 
 def matrix_for(kind: str, df: pd.DataFrame, features: list[str]) -> pd.DataFrame:

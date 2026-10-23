@@ -1,0 +1,218 @@
+{
+  "contract_version": "1.0.0",
+  "model_id": "parkinsons_risk_classifier",
+  "model_version": "legacy-unversioned",
+  "dataset_manifest": {
+    "dataset_sha256": null,
+    "manifest_status": "UNPINNED_NO_ACCESS (ml/data/DATASET_MANIFEST.json)",
+    "rows": 5801,
+    "subjects": 42
+  },
+  "protocol_version": null,
+  "training_code_revision": null,
+  "runtime_versions": {
+    "trained_with_scikit-learn": "1.9.0",
+    "trained_with_scikit-learn_basis": "inferred from the InconsistentVersionWarning raised on unpickling (MANIFEST.json)"
+  },
+  "feature_schema": {
+    "order": [
+      "delta_Jitter(%)",
+      "delta_Jitter(Abs)",
+      "delta_Jitter:RAP",
+      "delta_Jitter:PPQ5",
+      "delta_Jitter:DDP",
+      "delta_Shimmer",
+      "delta_Shimmer(dB)",
+      "delta_Shimmer:APQ3",
+      "delta_Shimmer:APQ5",
+      "delta_Shimmer:APQ11",
+      "delta_Shimmer:DDA",
+      "delta_NHR",
+      "delta_HNR",
+      "delta_RPDE",
+      "delta_DFA",
+      "delta_PPE",
+      "test_time",
+      "baseline_total_UPDRS"
+    ],
+    "count": 18
+  },
+  "feature_units": {
+    "delta_Jitter(%)": {
+      "unit": "percent",
+      "status": "from_feature_name",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Jitter(Abs)": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Jitter:RAP": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Jitter:PPQ5": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Jitter:DDP": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Shimmer": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Shimmer(dB)": {
+      "unit": "dB",
+      "status": "from_feature_name",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Shimmer:APQ3": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Shimmer:APQ5": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Shimmer:APQ11": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_Shimmer:DDA": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_NHR": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_HNR": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_RPDE": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_DFA": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "delta_PPE": {
+      "unit": null,
+      "status": "NOT_VERIFIED_no_unit_in_name_and_data_file_unavailable",
+      "is_delta_vs_first_visit": true
+    },
+    "test_time": {
+      "unit": "days",
+      "status": "from_dataset_documentation_summarised",
+      "convention": "days_since_recruitment_v1"
+    },
+    "baseline_total_UPDRS": {
+      "unit": "UPDRS points",
+      "status": "from_feature_name"
+    }
+  },
+  "preprocessing": {
+    "scaler": "StandardScaler",
+    "n_samples_seen": 5801,
+    "mean": [
+      -0.0020169970694707807,
+      -1.1736233408033099e-05,
+      -0.001173554559558697,
+      -0.0012953473539044995,
+      -0.0035233907946905707,
+      -0.005662784002758145,
+      -0.0412387519393208,
+      -0.0029415462851232546,
+      -0.0031873280468884676,
+      -0.004020165488708843,
+      -0.00882562144457852,
+      -0.010923772625409412,
+      1.6870299948284777,
+      -0.026844802620237883,
+      -0.016417867609032924,
+      -0.017120077917600413,
+      93.93711594552663,
+      26.94999689708671
+    ],
+    "scale": [
+      0.00993264506781853,
+      5.0867670650021614e-05,
+      0.005843924847981361,
+      0.006680216683329368,
+      0.017532580444388973,
+      0.026059033577322654,
+      0.22065882231231676,
+      0.014160480190027957,
+      0.01592142959956276,
+      0.022313145958807793,
+      0.04248157248003664,
+      0.05671457277122429,
+      3.781198021251288,
+      0.09789046537610065,
+      0.05503721066346481,
+      0.09421477040983085,
+      52.91910547356535,
+      10.561756389649158
+    ]
+  },
+  "target_definition": "worsening = 1 if total_UPDRS(t) - total_UPDRS(first visit) >= 3.0 points, else 0. The threshold is a provisional project parameter, not a validated minimal clinically important difference.",
+  "prediction_horizon": "CONCURRENT (nowcast): features and label are measured at the same session t. This is not a forecast of future worsening.",
+  "training_date": null,
+  "random_seeds": {
+    "estimator_random_state": 42,
+    "basis": "estimator random_state=42 appears in the superseded training script; the cross-validation splitters (LeaveOneGroupOut / GroupKFold) are deterministic. Read from source code, not recorded in the artifact."
+  },
+  "validation_pointer": {
+    "metadata_key": "pooled_metrics",
+    "caveat": "historical, model selection on the scoring folds, no confidence interval, not reproduced from data",
+    "registered_protocol_results": "NOT_RUN (data inaccessible): ml/validation/results/phase4a/*_NOT_RUN.json"
+  },
+  "calibration": {
+    "calibrated": false,
+    "parameters": null,
+    "note": "class-weighted / tree scores; no recalibration fitted"
+  },
+  "decision_threshold": {
+    "value": 0.5,
+    "rationale": null,
+    "note": "the estimator's own predict() rule (about 0.5 on predict_proba); no rationale was recorded"
+  },
+  "known_limitations": [
+    "Research demonstration on a small public dataset. Not clinically validated; not for diagnosis, monitoring or any decision about a patient.",
+    "No external validation.",
+    "Scores are uncalibrated.",
+    "Model selection used the same folds that produced the reported score (optimistic).",
+    "The model was trained on days since recruitment. The two conventions differ by the baseline visit's own offset from recruitment, which has not been quantified (it needs the training data). Supply days since recruitment."
+  ],
+  "artifact_checksum": {
+    "file": "parkinsons_risk_classifier.joblib",
+    "sha256": "8ab2957fd07284981207147390ac3b92ccb9e8820961a3781d8ba5b1329226a9",
+    "verified_against_manifest": true
+  },
+  "training_script_superseded": "ml/training/train_risk_classifier.py",
+  "artifact_first_committed_in": "156207c8b8d21830b95bae4c368a74646c42f89e",
+  "unrecoverable": {
+    "dataset_manifest": "the dataset file was never pinned; no SHA-256 of the training data is recorded anywhere",
+    "protocol_version": "the artifact predates the registered protocols",
+    "training_code_revision": "no git revision was recorded at training time (artifact_first_committed_in is the commit that added the file, not necessarily the training revision)",
+    "training_date": "not recorded in the artifact or its metadata",
+    "decision_threshold.rationale": "not recorded"
+  }
+}

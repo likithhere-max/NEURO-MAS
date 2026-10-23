@@ -17,3 +17,6 @@ backend/ml/data/cache/
 .ruff_cache/
 backend/ml/simulation/__pycache__/
 *.tsbuildinfo
+
+# Phase 5: patient-level predictions and fold assignments from real-data runs (never commit)
+backend/ml/validation/results/**/protected/

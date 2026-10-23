@@ -21,6 +21,8 @@ validity; it points to `ml/validation/results/*.json` for the (nested) estimate.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import hashlib
 import json
 import platform
 import subprocess
@@ -32,8 +34,10 @@ import pandas as pd
 
 from app.ml.ood import fit_domain
 from ml.evalkit import inner_select
+from ml.validation import artifact_contract as AC
 from ml.validation import candidates as C
 from ml.validation import data as D
+from ml.validation import dataset_manifest as DM
 
 HERE = Path(__file__).resolve().parent
 MODELS = HERE.parent / "models"
@@ -47,7 +51,8 @@ def _git_commit() -> str | None:
 
 
 def train(stem: str, kind: str, X: pd.DataFrame, y: pd.Series, groups: pd.Series, cands: dict, *, dataset_info: dict,
-          out_dir: Path, seed: int, inner_k: int = 5, results_pointer: str | None = None) -> dict:
+          out_dir: Path, seed: int, inner_k: int = 5, results_pointer: str | None = None,
+          manifest_status: dict | None = None, model_version: str = "2.0.0-candidate", protocol_version: str | None = None) -> dict:
     import sklearn
     X, y, g = X.reset_index(drop=True), y.reset_index(drop=True), pd.Series(np.asarray(groups)).reset_index(drop=True)
     name, scores, _, status = inner_select(cands, X, y, g, inner_k=inner_k, seed=seed)
@@ -71,6 +76,18 @@ def train(stem: str, kind: str, X: pd.DataFrame, y: pd.Series, groups: pd.Series
         "disclaimer": "Demonstration model on a small public research dataset. Clinically unvalidated; not for patient care.",
     }
     (out_dir / f"{stem}_metadata.json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
+    if protocol_version is None:
+        from ml.validation.phase4a import PROTOCOL
+        protocol_version = PROTOCOL["id"]
+    prov = AC.build_training_provenance(
+        kind="disease" if kind == "voice" else "risk", stem=stem, model_version=model_version, features=list(X.columns),
+        dataset_info=dataset_info, manifest_status=manifest_status or {"status": "NOT_CHECKED"}, protocol_version=protocol_version, seed=seed,
+        training_date=dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), X=X,
+        validation_pointer=results_pointer or "NONE_LINKED", threshold=0.5,
+        threshold_rationale="fixed a priori at 0.5 by the registered protocol; not tuned on any data",
+        artifact_sha256=hashlib.sha256(jl.read_bytes()).hexdigest(), code_revision=_git_commit())
+    (out_dir / f"{stem}_provenance.json").write_text(json.dumps(prov, indent=2, default=str) + "\n")
+    meta["provenance_status"] = AC.validate_provenance(prov)["status"]
     return meta
 
 
@@ -83,16 +100,18 @@ def main(argv=None) -> int:
     ap.add_argument("--fast", action="store_true")
     a = ap.parse_args(argv)
     if a.which == "disease":
-        df, info = D.load_disease(Path(a.csv) if a.csv else D.fetch("parkinsons"))
+        path = Path(a.csv) if a.csv else D.fetch("parkinsons")
+        df, info = D.load_disease(path)
         meta = train("parkinsons_demo_classifier", "voice", df[D.DISEASE_FEATURES], df["status"], df["subject"],
                      C.disease_candidates(a.fast), dataset_info=info, out_dir=Path(a.out_dir), seed=a.seed,
-                     results_pointer="ml/validation/results/disease.json")
+                     results_pointer="ml/validation/results/disease.json", manifest_status=DM.verify_file("parkinsons", path))
     else:
-        df, dcols, info = D.load_risk(Path(a.csv) if a.csv else D.fetch("parkinsons_updrs"))
+        path = Path(a.csv) if a.csv else D.fetch("parkinsons_updrs")
+        df, dcols, info = D.load_risk(path)
         cols = dcols + ["test_time", "baseline_total_UPDRS"]
         meta = train("parkinsons_risk_classifier", "risk", df[cols], df["worsening"], df["subject#"].astype(str),
                      C.risk_candidates(a.fast), dataset_info=info, out_dir=Path(a.out_dir), seed=a.seed,
-                     results_pointer="ml/validation/results/risk.json")
+                     results_pointer="ml/validation/results/risk.json", manifest_status=DM.verify_file("parkinsons_updrs", path))
     print(json.dumps({k: meta[k] for k in ("model", "selection", "sklearn_version")}, indent=2))
     print("Next: python -m ml.validation.validate_models manifest   (after copying artifacts into ml/models/ deliberately)")
     return 0

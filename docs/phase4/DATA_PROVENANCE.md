@@ -113,3 +113,8 @@ Linux 6.18 x86_64. The protocol (id `p4a-1`, SHA-256 `0b2f10a7ec885419d9a2e72ad8
 3. 31 vs 32 subjects in the disease data.
 4. The seed and dataset hash used to produce the shipped artifacts are not recorded, and the library version (1.9.0) is only inferred; the artifacts load under 1.9.1 with a version warning.
 5. Publisher facts in section 1 are tool-summarised, not hash-verified.
+
+
+---
+
+**Later note (Phase 5, 2026-10-23).** This report is preserved unchanged as historical evidence. Phase 5 re-audited it in `docs/phase5/` (start at `FINAL_READINESS_REPORT.md`). Items resolved since: the single `test_time` convention is enforced (E02), provenance sidecars exist for the shipped artifacts, the registered workflow and dataset manifest exist. Items still open because the data cannot be downloaded here: reproduction of every figure above, the 5,801 vs 5,833 and 31 vs 32 discrepancies, and all real-data results (`NOT_RUN`). The 764 passed / 26 skipped result quoted historically is unchanged; the Phase 5 regression is recorded separately.
