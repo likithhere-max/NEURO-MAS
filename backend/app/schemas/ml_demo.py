@@ -94,7 +94,10 @@ class ParkinsonsRiskFeaturesIn(BaseModel):
     delta_rpde: float = Field(..., alias="delta_RPDE")
     delta_dfa: float = Field(..., alias="delta_DFA")
     delta_ppe: float = Field(..., alias="delta_PPE")
-    test_time: float = Field(..., description="Days since the patient's baseline telemonitoring visit")
+    test_time: float = Field(..., description=(
+        "Days since RECRUITMENT into the study (the Telemonitoring dataset's own `test_time`, which is what the model was trained on). "
+        "It is NOT days since the baseline visit: the two differ by the baseline visit's own offset from recruitment, a training/"
+        "serving mismatch that has not been quantified."))
     baseline_total_UPDRS: float = Field(..., description="The patient's total_UPDRS score at their baseline visit")
 
 

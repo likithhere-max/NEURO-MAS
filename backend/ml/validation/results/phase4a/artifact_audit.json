@@ -1,0 +1,357 @@
+{
+  "task": "artifact_audit",
+  "status": "completed",
+  "evidence_status": "REAL_ARTIFACTS_NO_DATA_USED",
+  "clinically_validated": false,
+  "protocol_id": "p4a-1",
+  "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+  "protocol": {
+    "id": "p4a-1",
+    "threshold": 0.5,
+    "inner_k": 5,
+    "selection_metric": "roc_auc",
+    "seed_base": 20261023,
+    "default_seeds": 5,
+    "n_boot": 2000,
+    "n_perm": 200,
+    "disease": {
+      "outer": "logo",
+      "unit": "subject (parsed from the recording name)",
+      "target": "status (0 healthy / 1 PD), group-level",
+      "baselines": [
+        "dummy_prior",
+        "classic3_LR"
+      ]
+    },
+    "risk": {
+      "outer": 10,
+      "unit": "patient (subject#)",
+      "worsening_threshold_points": 3.0,
+      "target": "total_UPDRS(t) - total_UPDRS(first visit) >= threshold, concurrent, row-level",
+      "feature_sets": {
+        "FULL": "voice deltas + test_time + baseline_total_UPDRS",
+        "VOICE_ONLY": "voice deltas",
+        "TIME_BASELINE": "test_time + baseline_total_UPDRS",
+        "TIME_ONLY": "test_time",
+        "BASELINE_ONLY": "baseline_total_UPDRS",
+        "DEMOGRAPHIC_ONLY": "age + sex",
+        "TIME_DEMOGRAPHIC": "test_time + age + sex",
+        "TIME_BASELINE_DEMOGRAPHIC": "test_time + baseline_total_UPDRS + age + sex"
+      }
+    },
+    "reference_for_voice_value": [
+      "TIME_BASELINE",
+      "TIME_BASELINE_DEMOGRAPHIC"
+    ],
+    "interpretation_rule": "voice adds measurable information ONLY IF the 95% cluster-bootstrap interval of AUC(FULL) - AUC(reference) excludes 0 for every reference set AND the effect is reproduced for every seed; otherwise the data cannot show that it does. Neither outcome is evidence of clinical usefulness."
+  },
+  "environment": {
+    "python": "3.13.17",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1",
+    "joblib": "1.6.0",
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39"
+  },
+  "models": {
+    "disease": {
+      "sha256_matches_manifest": true,
+      "pipeline_steps": [
+        "scaler",
+        "select",
+        "classifier"
+      ],
+      "n_features": 22,
+      "training_rows_recorded_in_scaler": 195,
+      "metadata_keys": [
+        "candidates_compared",
+        "dataset",
+        "disclaimer",
+        "evaluation_strategy",
+        "feature_columns_in_order",
+        "loso_metrics",
+        "model",
+        "n_recordings",
+        "n_subjects",
+        "target_column",
+        "target_meaning",
+        "threshold_rationale",
+        "validation_thresholds"
+      ],
+      "records_sklearn_version": false,
+      "records_dataset_sha256": false,
+      "records_seed": false,
+      "metadata_n_subjects": 32,
+      "publisher_n_subjects": 31,
+      "n_recordings_claimed": 195,
+      "rows_match_scaler": true,
+      "selected_features_final_fit_all_rows": [
+        "MDVP:Fo(Hz)",
+        "MDVP:Flo(Hz)",
+        "MDVP:Shimmer",
+        "MDVP:Shimmer(dB)",
+        "Shimmer:APQ5",
+        "MDVP:APQ",
+        "HNR",
+        "spread1",
+        "spread2",
+        "PPE"
+      ],
+      "n_positive_rows_used": 147,
+      "reconstructed_confusion_matrices": {
+        "RandomForest": {
+          "TP": 125,
+          "FN": 22,
+          "FP": 31,
+          "TN": 17,
+          "consistent": true,
+          "sensitivity": 0.8503401360544217,
+          "specificity": 0.3541666666666667,
+          "accuracy": 0.7282051282051282,
+          "majority_class_accuracy": 0.7538461538461538,
+          "balanced_accuracy": 0.6022534013605442
+        },
+        "HistGradientBoosting": {
+          "TP": 138,
+          "FN": 9,
+          "FP": 31,
+          "TN": 17,
+          "consistent": true,
+          "sensitivity": 0.9387755102040817,
+          "specificity": 0.3541666666666667,
+          "accuracy": 0.7948717948717948,
+          "majority_class_accuracy": 0.7538461538461538,
+          "balanced_accuracy": 0.6464710884353742
+        },
+        "LogisticRegression": {
+          "TP": 112,
+          "FN": 35,
+          "FP": 23,
+          "TN": 25,
+          "consistent": true,
+          "sensitivity": 0.7619047619047619,
+          "specificity": 0.5208333333333334,
+          "accuracy": 0.7025641025641025,
+          "majority_class_accuracy": 0.7538461538461538,
+          "balanced_accuracy": 0.6413690476190477
+        },
+        "SVM_RBF": {
+          "TP": 106,
+          "FN": 41,
+          "FP": 25,
+          "TN": 23,
+          "consistent": true,
+          "sensitivity": 0.7210884353741497,
+          "specificity": 0.4791666666666667,
+          "accuracy": 0.6615384615384615,
+          "majority_class_accuracy": 0.7538461538461538,
+          "balanced_accuracy": 0.6001275510204082
+        },
+        "RandomForest_Top10Features": {
+          "TP": 130,
+          "FN": 17,
+          "FP": 27,
+          "TN": 21,
+          "consistent": true,
+          "sensitivity": 0.8843537414965986,
+          "specificity": 0.4375,
+          "accuracy": 0.7743589743589744,
+          "majority_class_accuracy": 0.7538461538461538,
+          "balanced_accuracy": 0.6609268707482994
+        }
+      },
+      "reported_winner": "RandomForest_Top10Features",
+      "reported_winner_metrics": {
+        "accuracy": 0.7743589743589744,
+        "precision": 0.8280254777070064,
+        "recall": 0.8843537414965986,
+        "f1": 0.8552631578947368,
+        "roc_auc": 0.7940759637188207
+      },
+      "winner_row_level_specificity_wilson95_NAIVE_LOWER_BOUND_ON_WIDTH": [
+        0.30701269040654244,
+        0.5772498258017222
+      ],
+      "winner_row_level_sensitivity_wilson95_NAIVE_LOWER_BOUND_ON_WIDTH": [
+        0.8226004432194957,
+        0.9265304713410932
+      ],
+      "winner_accuracy_minus_majority_accuracy": 0.02051282051282055
+    },
+    "risk": {
+      "sha256_matches_manifest": true,
+      "pipeline_steps": [
+        "scaler",
+        "classifier"
+      ],
+      "n_features": 18,
+      "training_rows_recorded_in_scaler": 5801,
+      "metadata_keys": [
+        "candidates_compared",
+        "dataset",
+        "disclaimer",
+        "evaluation_strategy",
+        "feature_columns_in_order",
+        "model",
+        "n_recordings_after_dropping_baseline_visits",
+        "n_subjects",
+        "pooled_metrics",
+        "positive_class_rate",
+        "target_column",
+        "target_meaning",
+        "threshold_disclaimer",
+        "validation_threshold",
+        "why_this_framing"
+      ],
+      "records_sklearn_version": false,
+      "records_dataset_sha256": false,
+      "records_seed": false,
+      "n_recordings_claimed": 5801,
+      "rows_match_scaler": true,
+      "n_subjects_claimed": 42,
+      "expected_rows_if_only_first_visits_dropped": 5833,
+      "rows_dropped_beyond_first_visit_per_subject": 32,
+      "logistic_coefficients_standardised": {
+        "delta_Jitter(%)": -1.7105552626462748,
+        "delta_Jitter(Abs)": 1.0667684522751366,
+        "delta_Jitter:RAP": -0.24724021817198,
+        "delta_Jitter:PPQ5": 1.1569567013173676,
+        "delta_Jitter:DDP": -0.1899033802702068,
+        "delta_Shimmer": -1.3430032378329253,
+        "delta_Shimmer(dB)": 0.4849658378958573,
+        "delta_Shimmer:APQ3": 0.3158574621073704,
+        "delta_Shimmer:APQ5": -0.269376218745101,
+        "delta_Shimmer:APQ11": 0.4057878085685943,
+        "delta_Shimmer:DDA": 0.30283455859934594,
+        "delta_NHR": -0.06659653434398596,
+        "delta_HNR": 0.3677474859217573,
+        "delta_RPDE": 0.2823470040532883,
+        "delta_DFA": -0.23357362764378234,
+        "delta_PPE": 0.21834070588131924,
+        "test_time": 0.9341294659208031,
+        "baseline_total_UPDRS": -0.3433467825154044
+      },
+      "abs_coef_test_time": 0.9341294659208031,
+      "abs_coef_baseline_total_UPDRS": 0.3433467825154044,
+      "jitter_delta_coefficients": {
+        "delta_Jitter(%)": -1.7105552626462748,
+        "delta_Jitter(Abs)": 1.0667684522751366,
+        "delta_Jitter:RAP": -0.24724021817198,
+        "delta_Jitter:PPQ5": 1.1569567013173676,
+        "delta_Jitter:DDP": -0.1899033802702068
+      },
+      "jitter_coefficients_have_mixed_signs": true,
+      "n_positive_rows_used": 2215,
+      "reconstructed_confusion_matrices": {
+        "LogisticRegression": {
+          "TP": 1325,
+          "FN": 890,
+          "FP": 1254,
+          "TN": 2332,
+          "consistent": true,
+          "sensitivity": 0.5981941309255079,
+          "specificity": 0.6503067484662577,
+          "accuracy": 0.6304085502499569,
+          "majority_class_accuracy": 0.618169281158421,
+          "balanced_accuracy": 0.6242504396958828
+        },
+        "RandomForest": {
+          "TP": 1317,
+          "FN": 898,
+          "FP": 1543,
+          "TN": 2043,
+          "consistent": true,
+          "sensitivity": 0.5945823927765237,
+          "specificity": 0.5697155605131066,
+          "accuracy": 0.57921048095156,
+          "majority_class_accuracy": 0.618169281158421,
+          "balanced_accuracy": 0.5821489766448151
+        }
+      },
+      "reported_winner": "LogisticRegression",
+      "reported_winner_metrics": {
+        "accuracy": 0.6304085502499569,
+        "precision": 0.5137650252035673,
+        "recall": 0.5981941309255079,
+        "f1": 0.5527743012098456,
+        "roc_auc": 0.6404992326567199
+      },
+      "winner_row_level_specificity_wilson95_NAIVE_LOWER_BOUND_ON_WIDTH": [
+        0.6345454862951558,
+        0.665746326690406
+      ],
+      "winner_row_level_sensitivity_wilson95_NAIVE_LOWER_BOUND_ON_WIDTH": [
+        0.5776241715795455,
+        0.6184240851675592
+      ],
+      "winner_accuracy_minus_majority_accuracy": 0.012239269091535943
+    }
+  },
+  "publisher_facts": {
+    "source_note": "Read from the publisher's dataset pages on 2026-10-23 by fetching archive.ics.uci.edu (page text summarised by a tool, NOT a hash-verified download of the data). Quoted figures should be re-checked against the pages.",
+    "parkinsons_telemonitoring_id189": {
+      "url": "https://archive.ics.uci.edu/dataset/189",
+      "doi": "10.24432/C5ZS3N",
+      "instances": 5875,
+      "subjects": 42,
+      "missing_values": false,
+      "license": "CC BY 4.0",
+      "total_UPDRS": "Clinician's total UPDRS score, linearly interpolated",
+      "motor_UPDRS": "Clinician's motor UPDRS score, linearly interpolated",
+      "test_time": "Time since recruitment into the trial; the integer part is the number of days since recruitment"
+    },
+    "parkinsons_id174": {
+      "url": "https://archive.ics.uci.edu/dataset/174",
+      "doi": "10.24432/C59C74",
+      "subjects_per_publisher": 31,
+      "subjects_with_PD_per_publisher": 23,
+      "recordings_text": "195",
+      "instances_metadata_field": 197,
+      "recordings_per_subject": "around six",
+      "missing_values": false,
+      "license": "CC BY 4.0"
+    }
+  },
+  "healthy_subject_specificity_resolution": {
+    "note": "If the disease model's 8 healthy subjects each count as one independent unit, the exact 95% interval for the subject-level specificity is determined by k = number of healthy subjects classified correctly:",
+    "clopper_pearson_n8": {
+      "0": [
+        0.0,
+        0.3694166475528192
+      ],
+      "1": [
+        0.0031597235312519063,
+        0.5265096708752065
+      ],
+      "2": [
+        0.031854026249944226,
+        0.6508557944128242
+      ],
+      "3": [
+        0.08523341413725354,
+        0.7551367836334484
+      ],
+      "4": [
+        0.15701277048705795,
+        0.842987229512942
+      ],
+      "5": [
+        0.2448632163665516,
+        0.9147665858627465
+      ],
+      "6": [
+        0.3491442055871758,
+        0.9681459737500557
+      ],
+      "7": [
+        0.47349032912479344,
+        0.9968402764687481
+      ],
+      "8": [
+        0.6305833524471807,
+        1.0
+      ]
+    }
+  }
+}

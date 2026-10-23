@@ -53,7 +53,7 @@ _risk_metadata = None
 
 DISCLAIMER = (
     "This is a DEMONSTRATION classifier trained on a public research dataset "
-    "(UCI Parkinsons, 195 voice recordings from 32 people). It is NOT connected "
+    "(UCI Parkinsons, 195 voice recordings from roughly 31-32 people; the publisher and the model metadata differ by one). It is NOT connected "
     "to any patient's real data, is NOT part of the NEURO-MAS clinical pipeline, "
     "and does NOT diagnose the person submitting this request. It exists solely "
     "to demonstrate a trained ML component."
@@ -66,9 +66,10 @@ RISK_DISCLAIMER = (
     "visit) is worsening, using a demonstration-only threshold that is NOT a "
     "validated clinical cutoff. It is NOT connected to any patient's real data, "
     "is NOT part of the NEURO-MAS clinical pipeline, and does NOT assess the "
-    "person submitting this request. Its cross-patient accuracy (ROC-AUC ~0.64) "
-    "is modest -- meaningfully better than chance, but far from clinical-grade. "
-    "It exists solely to demonstrate a trained ML component evaluated honestly."
+    "person submitting this request. Its reported cross-patient ROC-AUC (~0.64) was "
+    "selected on the same cross-validation folds it is reported on, has no confidence interval, and has not been compared with "
+    "models that use elapsed time or baseline severity alone; it has NOT been shown to exceed what those non-voice inputs would "
+    "give, and it is not clinical-grade. It exists solely to demonstrate a trained ML component."
 )
 
 

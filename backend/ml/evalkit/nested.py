@@ -116,7 +116,10 @@ def inner_select(candidates: dict[str, Callable], X: pd.DataFrame, y: pd.Series,
 def nested_group_cv(X: pd.DataFrame, y, groups, candidates: dict[str, Callable], *,
                     outer: str | int = "logo", inner_k: int = 5, selection_metric: str = "roc_auc",
                     threshold_policy: str = "fixed:0.5", seed: int = 0,
-                    group_level_target: bool = True) -> NestedResult:
+                    group_level_target: bool = True, check_duplicates: bool = True) -> NestedResult:
+    """`check_duplicates=False` is for LOW-DIMENSIONAL baseline feature sets (e.g. age+sex), where different subjects legitimately share an
+    identical feature vector. Splits depend only on groups/labels/seed, so the duplicate guard run on the full feature matrix covers the
+    same folds; callers that disable it must have run that full-matrix check."""
     if not isinstance(X, pd.DataFrame):
         raise TypeError("X must be a DataFrame (feature names are part of the contract)")
     X = X.reset_index(drop=True)
@@ -126,8 +129,8 @@ def nested_group_cv(X: pd.DataFrame, y, groups, candidates: dict[str, Callable],
         raise ValueError("X, y, groups must have equal length")
     if group_level_target:
         assert_group_labels_consistent(g, y)
-    outer_pairs = list(leave_one_group_out(g, X=X) if outer == "logo"
-                       else group_kfold(g, y, n_splits=int(outer), seed=seed, X=X))
+    outer_pairs = list(leave_one_group_out(g, X=X, check_duplicates=check_duplicates) if outer == "logo"
+                       else group_kfold(g, y, n_splits=int(outer), seed=seed, X=X, check_duplicates=check_duplicates))
 
     oof = np.full(len(y), np.nan)
     folds: list[FoldRecord] = []

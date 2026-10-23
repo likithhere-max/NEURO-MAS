@@ -271,6 +271,9 @@ def test_auc_symmetries(p, data):
     y = data.draw(st.lists(st.integers(0, 1), min_size=len(p), max_size=len(p)))
     assume(0 < sum(y) < len(y))
     p = np.array(p)
+    # Precondition (found by hypothesis in Phase 4A: p=[0.001, 0.0010000000000000002] -> 1-p rounds both to 0.999): the symmetries hold
+    # for a transform that keeps the scores distinct; floating-point rounding that creates a TIE legitimately changes the AUC.
+    assume(len(set((1 - p).tolist())) == len(p) and len(set((p ** 2).tolist())) == len(p))
     auc = M.score_metrics(y, p)["roc_auc"]
     assert M.score_metrics(y, 1 - p)["roc_auc"] == pytest.approx(1 - auc, abs=1e-12)                # reversal
     assert M.score_metrics(y, p ** 2)["roc_auc"] == pytest.approx(auc, abs=1e-12)                   # monotone transform

@@ -32,6 +32,7 @@ from ml.evalkit import (aggregate_by_group, auc_stat, cluster_bootstrap, evaluat
                         paired_cluster_bootstrap_diff, ppv_npv_at_prevalence, reliability_table, threshold_metrics)
 from ml.validation import candidates as C
 from ml.validation import data as D
+from ml.validation import fingerprint as F
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
@@ -267,11 +268,17 @@ def main(argv=None) -> int:
         if a.cmd == "disease":
             path = Path(a.csv) if a.csv else D.fetch("parkinsons")
             df, info = D.load_disease(path)
-            print(write("disease", run_disease_df(df, info, seed=a.seed, n_boot=a.n_boot, n_perm=a.n_perm, fast=a.fast, evidence="REAL_DATA_RUN"), out_dir))
+            # Phase 4A (E03): a file of the right SHAPE is not necessarily the real data. Only a file that reproduces the shipped
+            # artifact's scaler fingerprint is labelled as authenticated; anything else is explicitly "unauthenticated".
+            auth = F.authenticate("disease", path)
+            res = run_disease_df(df, info, seed=a.seed, n_boot=a.n_boot, n_perm=a.n_perm, fast=a.fast, evidence=F.evidence_status(auth))
+            print(write("disease", {**res, "authentication": auth}, out_dir))
         else:
             path = Path(a.csv) if a.csv else D.fetch("parkinsons_updrs")
             df, dcols, info = D.load_risk(path)
-            print(write("risk", run_risk_df(df, dcols, info, seed=a.seed, n_boot=a.n_boot, fast=a.fast, evidence="REAL_DATA_RUN"), out_dir))
+            auth = F.authenticate("risk", path)
+            res = run_risk_df(df, dcols, info, seed=a.seed, n_boot=a.n_boot, fast=a.fast, evidence=F.evidence_status(auth))
+            print(write("risk", {**res, "authentication": auth}, out_dir))
         return 0
     except Exception as e:  # a failed run is REPORTED as failed, never as a partial success
         payload = {"task": a.cmd, "status": "failed", "evidence_status": "NONE", "clinically_validated": False,
