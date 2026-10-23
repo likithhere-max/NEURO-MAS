@@ -38,3 +38,20 @@ describe("consensus support formatting", () => {
     expect(hypothesisStatusLabel("legacy")).toBe("");
   });
 });
+
+import { agentStatusStyle } from "../lib/labels";
+describe("agent status styling", () => {
+  it("timeouts and failures are critical, never neutral", () => {
+    expect(agentStatusStyle("timed_out").badge).toBe("badge-critical");
+    expect(agentStatusStyle("failed").badge).toBe("badge-critical");
+  });
+  it("abstained / insufficient data are warnings, not success", () => {
+    expect(agentStatusStyle("abstained").badge).toBe("badge-warn");
+    expect(agentStatusStyle("insufficient_data").badge).toBe("badge-warn");
+  });
+  it("unknown statuses render as a warning with the raw value, not as ok/info", () => {
+    const s = agentStatusStyle("brand_new");
+    expect(s.badge).toBe("badge-warn");
+    expect(s.label).toBe("brand_new");
+  });
+});

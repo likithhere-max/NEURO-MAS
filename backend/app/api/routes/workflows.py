@@ -26,6 +26,7 @@ from app.services.symptom_extraction import (
     extracted_profile_to_symptom_ins,
 )
 
+from app.core.config import get_settings
 from app.core.ratelimit import rate_limit_user  # noqa: E402
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -58,8 +59,11 @@ async def _deliver_notifications(client, workflow_state, patient: dict) -> None:
     """After the workflow is stored, hand permitted actions to the configured channel (if any). A failure here is
     logged and escalated by the dispatcher; it never changes the already-stored assessment or the HTTP result."""
     try:
-        from app.core.supabase_client import get_supabase_admin_client
-        admin = get_supabase_admin_client()
+        # Admin credentials are requested only when a delivery channel is configured (default: none).
+        admin = None
+        if (get_settings().notification_channel or "none").lower() != "none":
+            from app.core.supabase_client import get_supabase_admin_client
+            admin = get_supabase_admin_client()
         dispatcher = notification_service.build_dispatcher(
             admin, escalate=notification_service.make_alert_escalation(client),
             audit=lambda e: logger.info("notification_audit %s", e))

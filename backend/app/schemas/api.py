@@ -1,6 +1,49 @@
 from __future__ import annotations
 from typing import Any, Optional
-from pydantic import BaseModel, EmailStr, Field
+import math
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+# Bounds for the free-form observation dicts (vitals / wearable). They exist so that NaN/Infinity can never reach a
+# threshold comparison (NaN > x is always False, which would read as "normal") and so a request cannot carry an
+# arbitrarily large or deeply nested structure into the agents.
+_MAX_KEYS, _MAX_KEY_LEN, _MAX_STR, _MAX_DEPTH, _MAX_LIST = 100, 100, 500, 3, 1000
+
+
+def _check_value(v: Any, depth: int, path: str) -> None:
+    if depth > _MAX_DEPTH:
+        raise ValueError(f"{path}: nested deeper than {_MAX_DEPTH} levels")
+    if v is None or isinstance(v, bool):
+        return
+    if isinstance(v, (int, float)):
+        if isinstance(v, float) and not math.isfinite(v):
+            raise ValueError(f"{path}: non-finite number (NaN/Infinity) is not allowed")
+        return
+    if isinstance(v, str):
+        if len(v) > _MAX_STR:
+            raise ValueError(f"{path}: string longer than {_MAX_STR} characters")
+        return
+    if isinstance(v, dict):
+        _check_dict(v, depth + 1, path)
+        return
+    if isinstance(v, (list, tuple)):
+        if len(v) > _MAX_LIST:
+            raise ValueError(f"{path}: list longer than {_MAX_LIST} items")
+        for i, x in enumerate(v):
+            _check_value(x, depth + 1, f"{path}[{i}]")
+        return
+    raise ValueError(f"{path}: unsupported value type {type(v).__name__}")
+
+
+def _check_dict(d: dict, depth: int, path: str) -> None:
+    if len(d) > _MAX_KEYS:
+        raise ValueError(f"{path}: more than {_MAX_KEYS} keys")
+    for k, v in d.items():
+        if not isinstance(k, str) or len(k) > _MAX_KEY_LEN:
+            raise ValueError(f"{path}: keys must be strings of at most {_MAX_KEY_LEN} characters")
+        _check_value(v, depth, f"{path}.{k}")
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
@@ -39,7 +82,13 @@ class ObservationBatchIn(BaseModel):
     medication_logs: list[MedicationLogIn] = []
     wearable: dict[str, Any] = {}
     vitals: dict[str, Any] = {}
-    caregiver_notes: Optional[str] = None
+    caregiver_notes: Optional[str] = Field(default=None, max_length=5000)
+
+    @field_validator("wearable", "vitals")
+    @classmethod
+    def _bounded_finite(cls, v: dict, info) -> dict:
+        _check_dict(v, 1, info.field_name)
+        return v
 class MedicationIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     active: bool = True

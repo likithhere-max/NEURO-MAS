@@ -68,3 +68,21 @@ export function hypothesisStatusLabel(status: string | undefined): string {
     default: return "";
   }
 }
+
+// Agent run statuses (backend app/schemas/agent.py AgentStatus). A contract test in the backend suite fails if the
+// backend adds a status that is missing here, so a new outcome can never silently render as a neutral badge.
+export const AGENT_STATUS_STYLE: Record<string, { badge: string; icon: string; label: string }> = {
+  completed: { badge: "badge-ok", icon: "✓", label: "completed" },
+  running: { badge: "badge-info", icon: "→", label: "running" },
+  pending: { badge: "badge-info", icon: "…", label: "pending" },
+  skipped: { badge: "badge-warn", icon: "–", label: "skipped" },
+  abstained: { badge: "badge-warn", icon: "⚠", label: "abstained · no assessment" },
+  model_not_available: { badge: "badge-warn", icon: "⚠", label: "model not available" },
+  insufficient_data: { badge: "badge-warn", icon: "⚠", label: "insufficient data" },
+  timed_out: { badge: "badge-critical", icon: "⏱", label: "timed out · no result" },
+  failed: { badge: "badge-critical", icon: "✕", label: "failed" },
+};
+
+export function agentStatusStyle(status: string | null | undefined) {
+  return AGENT_STATUS_STYLE[status ?? ""] ?? { badge: "badge-warn", icon: "?", label: status ?? "unknown" };
+}

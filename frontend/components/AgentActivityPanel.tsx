@@ -1,22 +1,6 @@
 "use client";
 
-const STATUS_STYLE: Record<string, string> = {
-  completed: "badge-ok",
-  skipped: "badge-warn",
-  failed: "badge-critical",
-  model_not_available: "badge-warn",
-  running: "badge-info",
-  pending: "badge-info",
-};
-
-const STATUS_ICON: Record<string, string> = {
-  completed: "✓",
-  skipped: "–",
-  failed: "✕",
-  model_not_available: "⚠",
-  running: "→",
-  pending: "…",
-};
+import { agentStatusStyle } from "@/lib/labels";
 
 const AGENT_LABELS: Record<string, string> = {
   data_intake_agent: "Data Intake Agent",
@@ -40,7 +24,7 @@ export default function AgentActivityPanel({ agentResults }: { agentResults: Rec
       <div className="space-y-2">
         {names.map((name) => {
           const r = agentResults[name];
-          const style = STATUS_STYLE[r.status] || "badge-info";
+          const st = agentStatusStyle(r.status);
           return (
             <div key={name} className="flex items-center justify-between border border-neuro-border rounded-lg px-3 py-2">
               <div>
@@ -57,8 +41,8 @@ export default function AgentActivityPanel({ agentResults }: { agentResults: Rec
                     score {Math.round((r.confidence || 0) * 100)}%
                   </span>
                 )}
-                <span className={`badge ${style}`}>
-                  {STATUS_ICON[r.status] || "•"} {r.status}
+                <span className={`badge ${st.badge}`}>
+                  {st.icon} {st.label}
                 </span>
               </div>
             </div>

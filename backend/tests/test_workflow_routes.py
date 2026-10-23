@@ -271,3 +271,11 @@ def test_no_channel_configured_sends_nothing_and_keeps_actions_proposed(setup):
     body = _post_key("I can't breathe").json()
     esc = [a for a in body["proposed_actions"] if a["action_type"] == "emergency_escalation"][0]
     assert esc["status"] == "proposed"
+
+
+def test_default_config_does_not_log_an_error_or_need_admin_credentials(setup, caplog):
+    """NOTIFICATION_CHANNEL=none (default): the request path must not request admin credentials or log ERROR."""
+    import logging
+    with caplog.at_level(logging.ERROR, logger="neuromas.workflows"):
+        assert _post("mild headache").status_code == 200
+    assert not [r for r in caplog.records if "notification_stage_failed" in r.getMessage()]
