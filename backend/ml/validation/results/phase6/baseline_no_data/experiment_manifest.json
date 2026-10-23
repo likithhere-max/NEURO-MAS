@@ -1,0 +1,65 @@
+{
+  "manifest_schema": "neuro-mas-experiment-manifest/1",
+  "workflow_version": "1.0.0",
+  "git_commit": "6a9fdf6054566a59970b99cb5ea4d66c6b59ee13",
+  "git_dirty": false,
+  "argv": [
+    "/home/claude/likithhere-max/neuro-mas/backend/ml/validation/workflow.py",
+    "run",
+    "--out",
+    "ml/validation/results/phase6/baseline_no_data"
+  ],
+  "python_executable": "/tmp/claude-0/-home-claude/d4976552-b1de-5662-add6-151463a8a443/scratchpad/venv/bin/python",
+  "environment": {
+    "python": "3.13.17",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1",
+    "joblib": "1.6.0",
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39"
+  },
+  "protocol_id": "p4a-1",
+  "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+  "seed_base": 20261023,
+  "seeds": [
+    20261023,
+    20261024,
+    20261025,
+    20261026,
+    20261027
+  ],
+  "n_boot": 2000,
+  "n_perm": 200,
+  "fast": false,
+  "candidate_set": "p4a-1",
+  "overall_status": "not_run",
+  "exit_code": 2,
+  "experiments": {
+    "disease": {
+      "kind": "disease",
+      "status": "not_run",
+      "reason": "No data file for the 'disease' task. Looked at: ['/home/claude/likithhere-max/neuro-mas/backend/ml/data/cache/parkinsons.data']. Download https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data on a machine with internet access and pass it with --csv, or set NEUROMAS_PARKINSONS_CSV. No synthetic or substitute data is used.",
+      "outputs": [
+        "ml/validation/results/phase6/baseline_no_data/disease_NOT_RUN.json"
+      ],
+      "exit": 2
+    },
+    "risk": {
+      "kind": "risk",
+      "status": "not_run",
+      "reason": "No data file for the 'risk' task. Looked at: ['/home/claude/likithhere-max/neuro-mas/backend/ml/data/cache/parkinsons_updrs.data']. Download https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/telemonitoring/parkinsons_updrs.data on a machine with internet access and pass it with --csv, or set NEUROMAS_PARKINSONS_UPDRS_CSV. No synthetic or substitute data is used.",
+      "outputs": [
+        "ml/validation/results/phase6/baseline_no_data/risk_NOT_RUN.json"
+      ],
+      "exit": 2
+    }
+  },
+  "dataset_manifest": "UNPINNED_NO_ACCESS",
+  "clinically_validated": false,
+  "report_claims_verified": 0,
+  "output_sha256": {
+    "disease_NOT_RUN.json": "1f4ebd703643cf82b7e1853d8dbbc090e2b485434982a588e0c6664c277732c8",
+    "risk_NOT_RUN.json": "dfa8edcd35d0383a8de3ea8e92a0d38e02281152bf58e66d7b6491feb2d42bef"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "task": "phase6_report",
+  "report_version": "1.0.0",
+  "status": "not_run",
+  "clinically_validated": false,
+  "protocol_id": "p6-1",
+  "protocol_sha256": "7fd315bb10c38478c816c2bd552e8d799e0e36915ce027a50f49ab75b0606ec8",
+  "parent_protocol_id": "p4a-1",
+  "parent_protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+  "environment": {
+    "python": "3.13.17",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1",
+    "joblib": "1.6.0",
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39"
+  },
+  "n_boot": 1000,
+  "inputs": {
+    "p4a_dir": "ml/validation/results/phase6/baseline_no_data",
+    "ext_dir": null
+  },
+  "reasons": {
+    "risk": "risk: experiment status is not_run (No data file for the 'risk' task. Looked at: ['/home/claude/likithhere-max/neuro-mas/backend/ml/data/cache/parkinsons_updrs.data']. Download https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/telemonitoring/parkinsons_updrs.data on a machine with internet access and pass it with --csv, or set NEUROMAS_PARKINSONS_UPDRS_CSV. No synthetic or substitute data is used.)",
+    "disease": "disease: experiment status is not_run (No data file for the 'disease' task. Looked at: ['/home/claude/likithhere-max/neuro-mas/backend/ml/data/cache/parkinsons.data']. Download https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data on a machine with internet access and pass it with --csv, or set NEUROMAS_PARKINSONS_CSV. No synthetic or substitute data is used.)"
+  }
+}

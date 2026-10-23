@@ -1,0 +1,58 @@
+{
+  "task": "disease",
+  "status": "not_run",
+  "evidence_status": "NONE",
+  "clinically_validated": false,
+  "protocol_id": "p4a-1",
+  "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+  "protocol": {
+    "id": "p4a-1",
+    "threshold": 0.5,
+    "inner_k": 5,
+    "selection_metric": "roc_auc",
+    "seed_base": 20261023,
+    "default_seeds": 5,
+    "n_boot": 2000,
+    "n_perm": 200,
+    "disease": {
+      "outer": "logo",
+      "unit": "subject (parsed from the recording name)",
+      "target": "status (0 healthy / 1 PD), group-level",
+      "baselines": [
+        "dummy_prior",
+        "classic3_LR"
+      ]
+    },
+    "risk": {
+      "outer": 10,
+      "unit": "patient (subject#)",
+      "worsening_threshold_points": 3.0,
+      "target": "total_UPDRS(t) - total_UPDRS(first visit) >= threshold, concurrent, row-level",
+      "feature_sets": {
+        "FULL": "voice deltas + test_time + baseline_total_UPDRS",
+        "VOICE_ONLY": "voice deltas",
+        "TIME_BASELINE": "test_time + baseline_total_UPDRS",
+        "TIME_ONLY": "test_time",
+        "BASELINE_ONLY": "baseline_total_UPDRS",
+        "DEMOGRAPHIC_ONLY": "age + sex",
+        "TIME_DEMOGRAPHIC": "test_time + age + sex",
+        "TIME_BASELINE_DEMOGRAPHIC": "test_time + baseline_total_UPDRS + age + sex"
+      }
+    },
+    "reference_for_voice_value": [
+      "TIME_BASELINE",
+      "TIME_BASELINE_DEMOGRAPHIC"
+    ],
+    "interpretation_rule": "voice adds measurable information ONLY IF the 95% cluster-bootstrap interval of AUC(FULL) - AUC(reference) excludes 0 for every reference set AND the effect is reproduced for every seed; otherwise the data cannot show that it does. Neither outcome is evidence of clinical usefulness."
+  },
+  "environment": {
+    "python": "3.13.17",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1",
+    "joblib": "1.6.0",
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39"
+  },
+  "reason": "No data file for the 'disease' task. Looked at: ['/home/claude/likithhere-max/neuro-mas/backend/ml/data/cache/parkinsons.data']. Download https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data on a machine with internet access and pass it with --csv, or set NEUROMAS_PARKINSONS_CSV. No synthetic or substitute data is used."
+}
