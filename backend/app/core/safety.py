@@ -9,6 +9,7 @@ model-dependent code paths.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import IntEnum
 
@@ -46,6 +47,11 @@ ACTION_CATALOG: dict[str, dict] = {
 RESTRICTED_ACTION_TYPES = {
     k for k, v in ACTION_CATALOG.items() if v["level"] == AutonomyLevel.HUMAN_AUTHORIZATION_REQUIRED
 }
+
+
+def _is_finite_number(x) -> bool:
+    """True only for a real, finite int/float (bool, None, NaN, +-inf and non-numbers are all rejected)."""
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
 
 
 @dataclass
@@ -114,6 +120,14 @@ def evaluate_action(
     # RULE 4: low-risk actions still need minimum confidence + data quality +
     # bounded disagreement before running autonomously.
     if level == AutonomyLevel.EXECUTE_LOW_RISK:
+        # Phase 3 (D01): every comparison below is False for NaN, so a NaN/None/inf gate input used to FAIL OPEN and let the
+        # action run autonomously. A gate input that is not a finite number is missing information: fail closed.
+        bad = [n for n, v in (("disagreement", disagreement), ("top_confidence", top_confidence),
+                              ("data_quality", data_quality)) if not _is_finite_number(v)]
+        if bad:
+            reasons.append(f"Gate input(s) {bad} are not a finite number (non-finite or missing); cannot verify the "
+                           f"autonomy preconditions, so human approval is required.")
+            return SafetyDecision(False, level, True, reasons)
         if disagreement > settings.consensus_disagreement_threshold:
             reasons.append(f"Disagreement {disagreement} exceeds threshold "
                             f"{settings.consensus_disagreement_threshold}; requesting additional analysis "

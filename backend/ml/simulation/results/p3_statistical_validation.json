@@ -1,0 +1,779 @@
+{
+  "seed_base": 20261024,
+  "python": "3.13.17",
+  "numpy": "2.5.4",
+  "synthetic": true,
+  "S1_point_prediction_interval": {
+    "nominal": 0.05,
+    "trials_per_cell": 20000,
+    "false_positive_rate": {
+      "iid_gaussian": {
+        "n=3": {
+          "k": 1018,
+          "n": 20000,
+          "rate": 0.0509,
+          "wilson95": [
+            0.0479,
+            0.054
+          ]
+        },
+        "n=4": {
+          "k": 1029,
+          "n": 20000,
+          "rate": 0.0515,
+          "wilson95": [
+            0.0485,
+            0.0546
+          ]
+        },
+        "n=5": {
+          "k": 1015,
+          "n": 20000,
+          "rate": 0.0508,
+          "wilson95": [
+            0.0478,
+            0.0539
+          ]
+        },
+        "n=8": {
+          "k": 1022,
+          "n": 20000,
+          "rate": 0.0511,
+          "wilson95": [
+            0.0481,
+            0.0542
+          ]
+        },
+        "n=15": {
+          "k": 1012,
+          "n": 20000,
+          "rate": 0.0506,
+          "wilson95": [
+            0.0476,
+            0.0537
+          ]
+        },
+        "n=30": {
+          "k": 1078,
+          "n": 20000,
+          "rate": 0.0539,
+          "wilson95": [
+            0.0509,
+            0.0571
+          ]
+        }
+      },
+      "ar1_0.6": {
+        "n=3": {
+          "k": 1221,
+          "n": 20000,
+          "rate": 0.0611,
+          "wilson95": [
+            0.0578,
+            0.0645
+          ]
+        },
+        "n=4": {
+          "k": 1312,
+          "n": 20000,
+          "rate": 0.0656,
+          "wilson95": [
+            0.0623,
+            0.0691
+          ]
+        },
+        "n=5": {
+          "k": 1386,
+          "n": 20000,
+          "rate": 0.0693,
+          "wilson95": [
+            0.0659,
+            0.0729
+          ]
+        },
+        "n=8": {
+          "k": 1491,
+          "n": 20000,
+          "rate": 0.0746,
+          "wilson95": [
+            0.071,
+            0.0783
+          ]
+        },
+        "n=15": {
+          "k": 1330,
+          "n": 20000,
+          "rate": 0.0665,
+          "wilson95": [
+            0.0631,
+            0.07
+          ]
+        },
+        "n=30": {
+          "k": 1223,
+          "n": 20000,
+          "rate": 0.0612,
+          "wilson95": [
+            0.0579,
+            0.0646
+          ]
+        }
+      },
+      "iid_t3": {
+        "n=3": {
+          "k": 1284,
+          "n": 20000,
+          "rate": 0.0642,
+          "wilson95": [
+            0.0609,
+            0.0677
+          ]
+        },
+        "n=4": {
+          "k": 1341,
+          "n": 20000,
+          "rate": 0.067,
+          "wilson95": [
+            0.0637,
+            0.0706
+          ]
+        },
+        "n=5": {
+          "k": 1413,
+          "n": 20000,
+          "rate": 0.0707,
+          "wilson95": [
+            0.0672,
+            0.0743
+          ]
+        },
+        "n=8": {
+          "k": 1476,
+          "n": 20000,
+          "rate": 0.0738,
+          "wilson95": [
+            0.0703,
+            0.0775
+          ]
+        },
+        "n=15": {
+          "k": 1378,
+          "n": 20000,
+          "rate": 0.0689,
+          "wilson95": [
+            0.0655,
+            0.0725
+          ]
+        },
+        "n=30": {
+          "k": 1257,
+          "n": 20000,
+          "rate": 0.0629,
+          "wilson95": [
+            0.0596,
+            0.0663
+          ]
+        }
+      }
+    },
+    "reading": "iid Gaussian should sit at 5% for every n (verified if each Wilson interval contains 0.05)"
+  },
+  "S2_sequential_charts": {
+    "reps": 4000,
+    "series_length": 40,
+    "self_starting_family_wise_false_alarm_iid_gaussian_no_autocorr_gate": {
+      "cusum": {
+        "k": 286,
+        "n": 4000,
+        "rate": 0.0715,
+        "wilson95": [
+          0.0639,
+          0.0799
+        ]
+      },
+      "ewma": {
+        "k": 309,
+        "n": 4000,
+        "rate": 0.0772,
+        "wilson95": [
+          0.0694,
+          0.0859
+        ]
+      },
+      "either": {
+        "k": 411,
+        "n": 4000,
+        "rate": 0.1027,
+        "wilson95": [
+          0.0937,
+          0.1125
+        ]
+      }
+    },
+    "fixed_baseline_family_wise_false_alarm_35_steps_iid_gaussian": {
+      "b=5": {
+        "cusum": {
+          "k": 2033,
+          "n": 4000,
+          "rate": 0.5082,
+          "wilson95": [
+            0.4928,
+            0.5237
+          ]
+        },
+        "ewma": {
+          "k": 1980,
+          "n": 4000,
+          "rate": 0.495,
+          "wilson95": [
+            0.4795,
+            0.5105
+          ]
+        }
+      },
+      "b=12": {
+        "cusum": {
+          "k": 1270,
+          "n": 4000,
+          "rate": 0.3175,
+          "wilson95": [
+            0.3033,
+            0.3321
+          ]
+        },
+        "ewma": {
+          "k": 1215,
+          "n": 4000,
+          "rate": 0.3038,
+          "wilson95": [
+            0.2897,
+            0.3182
+          ]
+        }
+      },
+      "b=30": {
+        "cusum": {
+          "k": 740,
+          "n": 4000,
+          "rate": 0.185,
+          "wilson95": [
+            0.1733,
+            0.1973
+          ]
+        },
+        "ewma": {
+          "k": 699,
+          "n": 4000,
+          "rate": 0.1747,
+          "wilson95": [
+            0.1633,
+            0.1868
+          ]
+        }
+      }
+    },
+    "note": "Phase 2 quoted 6.9%/7.0% (self-starting) and 30-65% (fixed baseline) as literals inside anomaly_study.py; this section recomputes them from code."
+  },
+  "S3_trend_rule": {
+    "reps": 1500,
+    "type_I_error": {
+      "iid_gaussian": {
+        "n=20": {
+          "nominal_alpha": 0.01,
+          "with_autocorr_correction": {
+            "k": 7,
+            "n": 1500,
+            "rate": 0.0047,
+            "wilson95": [
+              0.0023,
+              0.0096
+            ]
+          },
+          "without_correction": {
+            "k": 9,
+            "n": 1500,
+            "rate": 0.006,
+            "wilson95": [
+              0.0032,
+              0.0114
+            ]
+          }
+        },
+        "n=40": {
+          "nominal_alpha": 0.01,
+          "with_autocorr_correction": {
+            "k": 8,
+            "n": 1500,
+            "rate": 0.0053,
+            "wilson95": [
+              0.0027,
+              0.0105
+            ]
+          },
+          "without_correction": {
+            "k": 10,
+            "n": 1500,
+            "rate": 0.0067,
+            "wilson95": [
+              0.0036,
+              0.0122
+            ]
+          }
+        }
+      },
+      "ar1_0.3": {
+        "n=20": {
+          "nominal_alpha": 0.01,
+          "with_autocorr_correction": {
+            "k": 36,
+            "n": 1500,
+            "rate": 0.024,
+            "wilson95": [
+              0.0174,
+              0.033
+            ]
+          },
+          "without_correction": {
+            "k": 60,
+            "n": 1500,
+            "rate": 0.04,
+            "wilson95": [
+              0.0312,
+              0.0511
+            ]
+          }
+        },
+        "n=40": {
+          "nominal_alpha": 0.01,
+          "with_autocorr_correction": {
+            "k": 19,
+            "n": 1500,
+            "rate": 0.0127,
+            "wilson95": [
+              0.0081,
+              0.0197
+            ]
+          },
+          "without_correction": {
+            "k": 62,
+            "n": 1500,
+            "rate": 0.0413,
+            "wilson95": [
+              0.0324,
+              0.0526
+            ]
+          }
+        }
+      },
+      "ar1_0.6": {
+        "n=20": {
+          "nominal_alpha": 0.01,
+          "with_autocorr_correction": {
+            "k": 71,
+            "n": 1500,
+            "rate": 0.0473,
+            "wilson95": [
+              0.0377,
+              0.0593
+            ]
+          },
+          "without_correction": {
+            "k": 187,
+            "n": 1500,
+            "rate": 0.1247,
+            "wilson95": [
+              0.1089,
+              0.1423
+            ]
+          }
+        },
+        "n=40": {
+          "nominal_alpha": 0.01,
+          "with_autocorr_correction": {
+            "k": 46,
+            "n": 1500,
+            "rate": 0.0307,
+            "wilson95": [
+              0.0231,
+              0.0407
+            ]
+          },
+          "without_correction": {
+            "k": 253,
+            "n": 1500,
+            "rate": 0.1687,
+            "wilson95": [
+              0.1506,
+              0.1885
+            ]
+          }
+        }
+      }
+    },
+    "power_drift_3sd_total_iid": {
+      "n=20": {
+        "k": 1064,
+        "n": 1500,
+        "rate": 0.7093,
+        "wilson95": [
+          0.6858,
+          0.7318
+        ]
+      },
+      "n=40": {
+        "k": 1484,
+        "n": 1500,
+        "rate": 0.9893,
+        "wilson95": [
+          0.9827,
+          0.9934
+        ]
+      }
+    }
+  },
+  "S4_leakage_and_selection": {
+    "reps": 40,
+    "truth": "labels are independent of features (true AUC = 0.5)",
+    "row_level_cv_auc_mean_lo_hi": [
+      0.9664,
+      0.9612,
+      0.9715
+    ],
+    "subject_level_cv_auc_mean_lo_hi": [
+      0.4696,
+      0.4364,
+      0.5029
+    ],
+    "leakage_guard_refuses_row_split": true,
+    "selection_reps": 13,
+    "naive_best_of_7_auc_mean_lo_hi": [
+      0.6493,
+      0.6143,
+      0.6843
+    ],
+    "nested_auc_mean_lo_hi": [
+      0.5291,
+      0.478,
+      0.5802
+    ],
+    "leave_one_subject_out_pooled_auc_on_null_mean_lo_hi": [
+      0.4734,
+      0.3955,
+      0.5512
+    ],
+    "logo_reading": "pooled leave-one-subject-out AUC on no-signal data falls BELOW 0.5 (training prior shifts against the held-out subject), so a LOSO result cannot be read against a 0.5 'chance' line without this correction"
+  },
+  "S5_class_weight_calibration": {
+    "model": "logistic regression, one feature, true shift 1 SD (well specified)",
+    "results": {
+      "prevalence=0.05": {
+        "plain": {
+          "mean_predicted": 0.0465,
+          "ece": 0.003
+        },
+        "balanced": {
+          "mean_predicted": 0.4123,
+          "ece": 0.3629
+        },
+        "balanced_after_prior_shift_correction": {
+          "mean_predicted": 0.049,
+          "ece": 0.0023
+        }
+      },
+      "prevalence=0.1": {
+        "plain": {
+          "mean_predicted": 0.0996,
+          "ece": 0.0016
+        },
+        "balanced": {
+          "mean_predicted": 0.4156,
+          "ece": 0.3159
+        },
+        "balanced_after_prior_shift_correction": {
+          "mean_predicted": 0.0999,
+          "ece": 0.0017
+        }
+      },
+      "prevalence=0.25": {
+        "plain": {
+          "mean_predicted": 0.247,
+          "ece": 0.0066
+        },
+        "balanced": {
+          "mean_predicted": 0.4472,
+          "ece": 0.1959
+        },
+        "balanced_after_prior_shift_correction": {
+          "mean_predicted": 0.2488,
+          "ece": 0.0048
+        }
+      },
+      "prevalence=0.5": {
+        "plain": {
+          "mean_predicted": 0.4999,
+          "ece": 0.004
+        },
+        "balanced": {
+          "mean_predicted": 0.5013,
+          "ece": 0.0034
+        },
+        "balanced_after_prior_shift_correction": {
+          "mean_predicted": 0.5013,
+          "ece": 0.0034
+        }
+      },
+      "prevalence=0.75": {
+        "plain": {
+          "mean_predicted": 0.7509,
+          "ece": 0.0044
+        },
+        "balanced": {
+          "mean_predicted": 0.5511,
+          "ece": 0.2014
+        },
+        "balanced_after_prior_shift_correction": {
+          "mean_predicted": 0.7509,
+          "ece": 0.0046
+        }
+      }
+    },
+    "reading": "balanced weighting makes scores ~ posterior at a 50% prior; the correction needs the DEPLOYMENT prevalence, which this project does not know -- hence scores are labelled uncalibrated (D10)."
+  },
+  "S6_input_domain_detector": {
+    "p_features": 8,
+    "n_train_rows": 500,
+    "n_train_groups": 25,
+    "reps": 20,
+    "rows": [],
+    "false_rejection_rate_mean": 0.0131,
+    "false_rejection_rate_range": [
+      0.005,
+      0.035
+    ],
+    "missed_ood_rate_mean": {
+      "shift_3sd_one_feature": 0.4731,
+      "unit_error_x1000_one_feature": 0.0,
+      "break_correlation_shuffle_pair": 0.981,
+      "all_features_shift_1sd": 0.7499
+    },
+    "design_target_false_rejection": "<= 1% from the 0.99 quantile threshold, plus range-margin rejections"
+  },
+  "S7_consensus_shared_error": {
+    "trials": 3000,
+    "setup": "true H1 support .55 vs H2 .45, N(0,.15) observation noise, 2 voting agents",
+    "results": {
+      "single": {
+        "top1_correct": {
+          "k": 1930,
+          "n": 3000,
+          "rate": 0.6433,
+          "wilson95": [
+            0.626,
+            0.6603
+          ]
+        },
+        "reported_independent_sources": 1.0
+      },
+      "independent": {
+        "top1_correct": {
+          "k": 2110,
+          "n": 3000,
+          "rate": 0.7033,
+          "wilson95": [
+            0.6867,
+            0.7194
+          ]
+        },
+        "reported_independent_sources": 2.0
+      },
+      "shared": {
+        "top1_correct": {
+          "k": 1960,
+          "n": 3000,
+          "rate": 0.6533,
+          "wilson95": [
+            0.6361,
+            0.6702
+          ]
+        },
+        "reported_independent_sources": 2.0
+      }
+    },
+    "reading": "'shared' reports 2 independent sources like 'independent' but its accuracy equals the single-source accuracy: the index cannot see correlated evidence unless the emitter declares it (known limitation)."
+  },
+  "S8_risk_heuristic_enumeration": {
+    "fall_risk": {
+      "none": {
+        "score": 0,
+        "bucket": "low"
+      },
+      "missed_checkins_ge3": {
+        "score": 0.1,
+        "bucket": "low"
+      },
+      "longitudinal_deteriorating": {
+        "score": 0.25,
+        "bucket": "medium"
+      },
+      "longitudinal_deteriorating+missed_checkins_ge3": {
+        "score": 0.35,
+        "bucket": "medium"
+      },
+      "tremor_increase": {
+        "score": 0.25,
+        "bucket": "medium"
+      },
+      "tremor_increase+missed_checkins_ge3": {
+        "score": 0.35,
+        "bucket": "medium"
+      },
+      "tremor_increase+longitudinal_deteriorating": {
+        "score": 0.5,
+        "bucket": "high"
+      },
+      "tremor_increase+longitudinal_deteriorating+missed_checkins_ge3": {
+        "score": 0.6,
+        "bucket": "high"
+      },
+      "gait_slowing": {
+        "score": 0.4,
+        "bucket": "medium"
+      },
+      "gait_slowing+missed_checkins_ge3": {
+        "score": 0.5,
+        "bucket": "high"
+      },
+      "gait_slowing+longitudinal_deteriorating": {
+        "score": 0.65,
+        "bucket": "high"
+      },
+      "gait_slowing+longitudinal_deteriorating+missed_checkins_ge3": {
+        "score": 0.75,
+        "bucket": "critical"
+      },
+      "gait_slowing+tremor_increase": {
+        "score": 0.65,
+        "bucket": "high"
+      },
+      "gait_slowing+tremor_increase+missed_checkins_ge3": {
+        "score": 0.75,
+        "bucket": "critical"
+      },
+      "gait_slowing+tremor_increase+longitudinal_deteriorating": {
+        "score": 0.9,
+        "bucket": "critical"
+      },
+      "gait_slowing+tremor_increase+longitudinal_deteriorating+missed_checkins_ge3": {
+        "score": 1.0,
+        "bucket": "critical"
+      }
+    },
+    "seizure_risk": {
+      "low_adherence=0,recent_seizures=0,urgency_high=0": {
+        "score": 0.0,
+        "bucket": "low"
+      },
+      "low_adherence=0,recent_seizures=0,urgency_high=1": {
+        "score": 0.3,
+        "bucket": "medium"
+      },
+      "low_adherence=0,recent_seizures=1,urgency_high=0": {
+        "score": 0.1,
+        "bucket": "low"
+      },
+      "low_adherence=0,recent_seizures=1,urgency_high=1": {
+        "score": 0.4,
+        "bucket": "medium"
+      },
+      "low_adherence=0,recent_seizures=2,urgency_high=0": {
+        "score": 0.2,
+        "bucket": "low"
+      },
+      "low_adherence=0,recent_seizures=2,urgency_high=1": {
+        "score": 0.5,
+        "bucket": "high"
+      },
+      "low_adherence=0,recent_seizures=3,urgency_high=0": {
+        "score": 0.3,
+        "bucket": "medium"
+      },
+      "low_adherence=0,recent_seizures=3,urgency_high=1": {
+        "score": 0.6,
+        "bucket": "high"
+      },
+      "low_adherence=0,recent_seizures=5,urgency_high=0": {
+        "score": 0.4,
+        "bucket": "medium"
+      },
+      "low_adherence=0,recent_seizures=5,urgency_high=1": {
+        "score": 0.7,
+        "bucket": "high"
+      },
+      "low_adherence=1,recent_seizures=0,urgency_high=0": {
+        "score": 0.35,
+        "bucket": "medium"
+      },
+      "low_adherence=1,recent_seizures=0,urgency_high=1": {
+        "score": 0.65,
+        "bucket": "high"
+      },
+      "low_adherence=1,recent_seizures=1,urgency_high=0": {
+        "score": 0.45,
+        "bucket": "medium"
+      },
+      "low_adherence=1,recent_seizures=1,urgency_high=1": {
+        "score": 0.75,
+        "bucket": "critical"
+      },
+      "low_adherence=1,recent_seizures=2,urgency_high=0": {
+        "score": 0.55,
+        "bucket": "high"
+      },
+      "low_adherence=1,recent_seizures=2,urgency_high=1": {
+        "score": 0.85,
+        "bucket": "critical"
+      },
+      "low_adherence=1,recent_seizures=3,urgency_high=0": {
+        "score": 0.65,
+        "bucket": "high"
+      },
+      "low_adherence=1,recent_seizures=3,urgency_high=1": {
+        "score": 0.95,
+        "bucket": "critical"
+      },
+      "low_adherence=1,recent_seizures=5,urgency_high=0": {
+        "score": 0.75,
+        "bucket": "critical"
+      },
+      "low_adherence=1,recent_seizures=5,urgency_high=1": {
+        "score": 1.0,
+        "bucket": "critical"
+      }
+    },
+    "deterioration_risk": {
+      "longitudinal_deteriorating=0,diagnostic_conf_gt_0.5=0": {
+        "score": 0.0,
+        "bucket": "low"
+      },
+      "longitudinal_deteriorating=0,diagnostic_conf_gt_0.5=1": {
+        "score": 0.25,
+        "bucket": "medium"
+      },
+      "longitudinal_deteriorating=1,diagnostic_conf_gt_0.5=0": {
+        "score": 0.5,
+        "bucket": "high"
+      },
+      "longitudinal_deteriorating=1,diagnostic_conf_gt_0.5=1": {
+        "score": 0.75,
+        "bucket": "critical"
+      }
+    },
+    "observations": [
+      "Every weight is an unvalidated constant; the bucket is a monotone step function of a weighted sum of binary flags.",
+      "The same longitudinal 'deteriorating' flag raises BOTH fall_risk (+.25) and deterioration_risk (+.50): the sub-scores are not independent.",
+      "overall = max of the three sub-scores, so one saturated factor dominates regardless of the others.",
+      "deterioration_risk adds the diagnostic agent's retrieval confidence (a similarity score) as if it measured clinical deterioration.",
+      "A single missing input (e.g. no adherence data) lowers the score exactly like a good value; coverage is reported separately."
+    ]
+  }
+}

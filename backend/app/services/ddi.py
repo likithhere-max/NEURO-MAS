@@ -25,6 +25,7 @@ from __future__ import annotations
 import itertools
 import json
 import re
+import unicodedata
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -51,10 +52,36 @@ _PRIORITY = [DDIStatus.KNOWN_INTERACTION, DDIStatus.NO_INTERACTION_FOUND_IN_SOUR
              DDIStatus.DRUG_NOT_RECOGNIZED, DDIStatus.SOURCE_OUTDATED, DDIStatus.LOOKUP_FAILED, DDIStatus.SOURCE_UNAVAILABLE]
 _DEFINITIVE = {DDIStatus.KNOWN_INTERACTION, DDIStatus.NO_INTERACTION_FOUND_IN_SOURCE}
 _SEVERITY_ORDER = {"high": 3, "medium": 2, "low": 1}
+_UNSPECIFIED_SEVERITY = {"", "unknown", "none", "unspecified"}
+
+
+def severity_rank(label: Any) -> int:
+    """Rank of a severity label for choosing the summary severity of a pair listed by several sources.
+
+    Phase 3 (D04): the old key gave EVERY label outside {high, medium, low} (and any capitalised 'High') rank 0, so a source
+    saying "contraindicated" lost to another source saying "low". Now: recognised labels (case-insensitive) keep their
+    order; an unspecified severity carries no claim (rank 0); any OTHER non-empty label is an unrecognised claim and
+    ranks above 'high' so the more alarming statement can never be hidden. The label itself is reported verbatim."""
+    k = str(label or "").strip().lower()
+    if k in _SEVERITY_ORDER:
+        return _SEVERITY_ORDER[k]
+    return 0 if k in _UNSPECIFIED_SEVERITY else 99
 
 
 def normalize_name(name: Any) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", str(name or "").lower()).strip()
+    """Canonical key for a drug name: case-folded, accents removed, punctuation collapsed.
+
+    Phase 3 (D05): the old key kept only [a-z0-9], so a name in another script (e.g. Devanagari) normalised to the EMPTY
+    string and was silently dropped from the check, and 'L\u00e9vodopa' became 'l vodopa'. Latin accents are now folded
+    ('levodopa'); a name that still contains non-Latin letters is kept in its own script (NFKC, case-folded) so it can be
+    reported as unrecognised or matched against a snapshot that lists it."""
+    raw = str(name or "")
+    decomposed = unicodedata.normalize("NFKD", raw)
+    # strip only the Combining Diacritical Marks block (U+0300-U+036F: Latin accents); Indic/other-script marks are kept
+    folded = "".join(ch for ch in decomposed if not 0x300 <= ord(ch) <= 0x36F).casefold()
+    if any(ch.isalpha() and not ch.isascii() for ch in folded):
+        return re.sub(r"[\W_]+", " ", unicodedata.normalize("NFKC", raw).casefold()).strip()
+    return re.sub(r"[^a-z0-9]+", " ", folded).strip()
 
 
 @dataclass
@@ -226,12 +253,17 @@ class DDIChecker:
     def check(self, drug_names: Iterable[Any], now: datetime | None = None) -> DDIReport:
         now = now or datetime.now(timezone.utc)
         seen: dict[str, str] = {}
+        unusable: list[str] = []
         for n in drug_names or []:
             k = normalize_name(n)
             if k and k not in seen:
                 seen[k] = str(n).strip()
+            elif not k and str(n or "").strip():
+                unusable.append(str(n).strip())           # e.g. "???": cannot be checked -> reported, never dropped silently
         drugs = sorted(seen.values(), key=str.lower)
         warnings: list[str] = []
+        if unusable:
+            warnings.append(f"ddi_name_unusable: {unusable} could not be interpreted as drug names and were NOT checked")
         if len(drugs) > MAX_DRUGS:
             warnings.append(f"ddi_truncated: {len(drugs)} drugs supplied, only the first {MAX_DRUGS} were checked")
             drugs = drugs[:MAX_DRUGS]
@@ -269,7 +301,7 @@ class DDIChecker:
             warnings.append(f"ddi_incomplete: {len(incomplete)} of {len(pairs)} pair(s) not assessed {counts}")
         warnings.append("absence_of_a_finding_is_not_evidence_of_safety")
         return DDIReport(drugs=drugs, pairs=pairs, sources=src_info, warnings=warnings,
-                         complete=bool(usable) and not incomplete, unrecognized_drugs=unrec)
+                         complete=bool(usable) and not incomplete and not unusable, unrecognized_drugs=unrec)
 
     @staticmethod
     def _assess(s: DDISource, old: bool, a: str, b: str) -> PairAssessment:
@@ -296,8 +328,7 @@ class DDIChecker:
         best = min(results, key=lambda r: _PRIORITY.index(r.status))
         sev = None
         if best.status == DDIStatus.KNOWN_INTERACTION:       # highest severity among all sources that list it
-            sev = max((r.severity for r in results if r.status == DDIStatus.KNOWN_INTERACTION),
-                      key=lambda x: _SEVERITY_ORDER.get(x or "", 0))
+            sev = max((r.severity for r in results if r.status == DDIStatus.KNOWN_INTERACTION), key=severity_rank)
         return PairResult(a, b, best.status, sev, results)
 
 

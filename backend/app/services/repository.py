@@ -54,7 +54,9 @@ def build_patient_state(client: Client, patient: dict) -> PatientState:
         {"name": med["name"], "active": med["active"], "schedule": med["schedule"]}
         for med in medications_rows if med["active"]
     ]
-    adherence_values = [med["adherence_pct_30d"] for med in medications_rows if med["adherence_pct_30d"] is not None]
+    # Phase 3 (D08): only ACTIVE medications count -- a stopped drug's old adherence must not drag the current average down.
+    adherence_values = [med["adherence_pct_30d"] for med in medications_rows
+                        if med["active"] and med["adherence_pct_30d"] is not None]
     adherence_avg = round(sum(adherence_values) / len(adherence_values), 3) if adherence_values else None
 
     # Group individual readings by metric as (timestamp, value) pairs (already ordered oldest-first by the

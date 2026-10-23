@@ -19,7 +19,7 @@ import re
 
 from app.ai.gemini_service import embed_text
 from app.core.supabase_client import get_supabase_admin_client
-from app.services.knowledge_base import get_knowledge_base
+from app.services.knowledge_base import STOPWORDS, get_knowledge_base
 
 logger = logging.getLogger("neuromas.rag")
 
@@ -31,7 +31,7 @@ _WORD_RE = re.compile(r"[a-z0-9]+")
 
 
 def _tokenize(text: str) -> set[str]:
-    return set(_WORD_RE.findall(text.lower()))
+    return set(_WORD_RE.findall(text.lower())) - STOPWORDS
 
 
 def _semantic_search_sync(query: str, top_k: int) -> list[dict]:
@@ -62,8 +62,13 @@ def _semantic_search_sync(query: str, top_k: int) -> list[dict]:
 def _apply_confidence(candidates: list[dict], known_conditions: list[str]) -> list[dict]:
     for c in candidates:
         confidence = min(max(c["retrieval_score"], 0.0), 1.0) * MAX_HEURISTIC_CONFIDENCE
+        # Phase 3 (D09): the retrieval-only value is kept separately. The +0.15 below is a PRIOR taken from the patient's
+        # record, not evidence from the current symptoms, so it must not be fed to the consensus as symptom evidence.
+        c["retrieval_confidence"] = round(confidence, 2)
+        c["history_prior_applied"] = False
         if c["preferred_name"] in known_conditions or c["disease_id"] in known_conditions:
             confidence = min(confidence + 0.15, MAX_HEURISTIC_CONFIDENCE)
+            c["history_prior_applied"] = True
         c["confidence"] = round(confidence, 2)
     candidates.sort(key=lambda c: c["confidence"], reverse=True)
     return candidates

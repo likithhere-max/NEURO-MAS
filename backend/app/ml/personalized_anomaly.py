@@ -29,6 +29,10 @@ CONFIDENCE_LEVEL = 0.95
 # history is treated as rounding noise (heuristic, documented).
 ZERO_VARIANCE_REL_TOL = 0.05
 ZERO_VARIANCE_ABS_TOL = 1e-6
+# A sample SD below this (relative to max(1, |mean|)) is floating-point representation noise, not a measured spread:
+# 0.1+0.2 vs 0.3 gives SD 2.8e-17, which made z = 3.6e9 and flagged a 3e-7 relative deviation (Phase 3, D07).
+# Same guard as the Q-statistic code in app/ml/longitudinal.py.
+SD_NOISE_FLOOR_REL = 1e-12
 
 # Two-sided 95% Student-t critical values, d.f. 1..30 (standard table).
 _T_975 = {
@@ -124,7 +128,7 @@ def detect_personal_anomaly(
     mean = statistics.fmean(clean)
     stdev = statistics.stdev(clean)  # sample SD (n-1)
 
-    if stdev == 0:
+    if stdev <= SD_NOISE_FLOOR_REL * max(1.0, abs(mean)):
         tol = max(ZERO_VARIANCE_ABS_TOL, ZERO_VARIANCE_REL_TOL * abs(mean))
         return _result("zero_variance", n, mean=mean, stdev=0.0, anomaly=abs(latest - mean) > tol, note=note)
 

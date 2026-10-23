@@ -271,7 +271,14 @@ async def _run_workflow(
 
     # --- Personalization -> Action proposals ---------------------------
     personalization = state.agent_results.get("personalization_agent")
-    data_quality = data_quality_q if data_quality_q is not None else 0.5
+    # Phase 3 (D12): UNKNOWN data quality (intake agent failed / abstained / returned no number) used to be replaced by 0.5, which
+    # clears the 0.3 safety gate, so low-risk actions still ran autonomously on data nobody had assessed. Unknown is not
+    # "adequate": fail closed (0.0 -> the gate requires human approval) and leave an audit event saying why.
+    if data_quality_q is None or isinstance(data_quality_q, bool) or not isinstance(data_quality_q, (int, float)):
+        data_quality = 0.0
+        _log(state, "data_quality_unknown_fail_closed", {"intake_status": str(intake.status) if intake is not None else "missing"})
+    else:
+        data_quality = data_quality_q
     # No unique supported leader (tie / contradicted / unsupported / no evidence) -> zero confidence, so the safety
     # gate blocks autonomy rather than inheriting a number from an unrelated hypothesis.
     top_confidence = (next((h.consensus_score for h in state.consensus.hypotheses

@@ -29,28 +29,38 @@ logger = logging.getLogger(__name__)
 
 Polarity = Literal["higher_worse", "lower_worse", "unknown"]
 
-_HIGHER_WORSE_PATTERNS = [
-    r"tremor", r"seizure", r"fall(s|_count|_rate)?\b", r"updrs", r"rigid", r"bradykin", r"dyskin",
-    r"pain", r"headache", r"fatigue", r"severity", r"symptom_score", r"relapse", r"missed_dose",
-    r"edss", r"hoehn", r"sleep_latency", r"freezing",
-]
-_LOWER_WORSE_PATTERNS = [
-    r"gait_speed", r"walking_speed", r"walk_speed", r"stride", r"step_length", r"moca", r"mmse",
-    r"cognit", r"grip", r"strength", r"balance_score", r"balance", r"adherence", r"steps", r"fvc",
-    r"sleep_hours", r"sleep_duration", r"sleep_efficiency", r"verbal_fluency", r"memory",
-]
+# Phase 3 (D03): the original registry matched SUBSTRINGS of the name, which mis-assigned polarity ("stride_time_variability"
+# -> lower_worse because it contains "stride"; "missteps_count" -> lower_worse because it contains "steps";
+# "seizure_free_days" -> higher_worse because it contains "seizure"). Matching is now on whole tokens / adjacent token
+# phrases, a name carrying a modifier that changes or blurs the direction is "unknown", and a name that matches BOTH
+# families is "unknown". "unknown" is always safe: the change is reported for a clinician to judge, never guessed.
+_TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
+_HIGHER_STEMS = ("tremor", "seizure", "updrs", "rigid", "bradykin", "dyskin", "pain", "headache", "fatigue", "severity",
+                 "relapse", "edss", "hoehn", "freezing")                       # token START (inflections allowed)
+_HIGHER_WORDS = {"fall", "falls"}                                              # whole token only
+_HIGHER_PHRASES = ("symptom_score", "missed_dose", "sleep_latency")            # adjacent whole tokens
+_LOWER_STEMS = ("cognit", "grip", "strength", "balance", "adherence", "memory")
+_LOWER_WORDS = {"moca", "mmse", "fvc", "steps"}
+_LOWER_PHRASES = ("gait_speed", "walking_speed", "walk_speed", "stride_length", "step_length", "sleep_hours",
+                  "sleep_duration", "sleep_efficiency", "verbal_fluency")
+# Tokens that invert the meaning ("free"), measure spread rather than level, or describe a change/impairment whose
+# direction the registry does not encode.
+_DIRECTION_MODIFIERS = {"variability", "variance", "cv", "sd", "std", "asymmetry", "free", "impairment", "complaint",
+                        "complaints", "loss", "decline", "improvement", "reduction", "change", "delta"}
 
 
 def metric_polarity(metric: str) -> Polarity:
-    m = (metric or "").strip().lower()
-    # Order matters only on overlap; "adherence"/"steps" are lower-worse, "fatigue" higher-worse.
-    for pat in _LOWER_WORSE_PATTERNS:
-        if re.search(pat, m):
-            return "lower_worse"
-    for pat in _HIGHER_WORSE_PATTERNS:
-        if re.search(pat, m):
-            return "higher_worse"
-    return "unknown"
+    toks = [t for t in _TOKEN_SPLIT.split((metric or "").strip().lower()) if t]
+    if not toks or _DIRECTION_MODIFIERS & set(toks):
+        return "unknown"
+    joined = "_" + "_".join(toks) + "_"
+    higher = (any(t.startswith(st) for t in toks for st in _HIGHER_STEMS) or bool(_HIGHER_WORDS & set(toks))
+              or any(f"_{ph}_" in joined for ph in _HIGHER_PHRASES))
+    lower = (any(t.startswith(st) for t in toks for st in _LOWER_STEMS) or bool(_LOWER_WORDS & set(toks))
+             or any(f"_{ph}_" in joined for ph in _LOWER_PHRASES))
+    if higher and lower:
+        return "unknown"
+    return "higher_worse" if higher else "lower_worse" if lower else "unknown"
 
 
 STABLE_BAND = 0.05        # default; override with METRIC_STABLE_BAND
@@ -123,7 +133,10 @@ def classify_change(metric: str, baseline: Optional[float], current: Optional[fl
         # Clinician-approved absolute threshold replaces the provisional relative rule for this metric.
         adverse_abs = delta_abs if pol == "higher_worse" else -delta_abs
         dp = (delta_abs / abs(baseline)) if baseline != 0 else None
-        cls = "deteriorating" if adverse_abs >= mcid else "improving" if adverse_abs <= -mcid else "stable"
+        # Phase 3 (D02): `current - baseline` carries IEEE-754 representation error (1.4 - 1.1 = 0.2999999999999998), so a change
+        # equal to the MCID up to rounding must still count. Tolerance = 1e-9 relative to the MCID plus 8 ulps of the operands.
+        tol = 1e-9 * mcid + 8 * 2.220446049250313e-16 * max(abs(baseline), abs(current))
+        cls = "deteriorating" if adverse_abs >= mcid - tol else "improving" if adverse_abs <= -mcid + tol else "stable"
         return out(cls, delta_abs, dp, use_mcid=True)
     if baseline == 0:
         if current == 0:

@@ -194,11 +194,14 @@ class NeuroDiagnosticAgent(BaseNeuroAgent):
             hypothesis_evidence=[
                 HypothesisEvidence(
                     source_agent=self.name, hypothesis=c["preferred_name"], evidence_type=EvidenceType.DIAGNOSTIC,
-                    direction=Direction.SUPPORTS, strength=float(c.get("confidence", 0.0)),
+                    direction=Direction.SUPPORTS,
+                    # retrieval evidence only: the patient-history prior (+0.15) is NOT symptom evidence (Phase 3, D09)
+                    strength=float(c.get("retrieval_confidence", c.get("confidence", 0.0))),
                     score_kind="retrieval_confidence_capped",
                     # lexical and semantic retrieval read the SAME symptom text: one observation, not two
                     independence_group="symptom_text_retrieval",
-                    provenance=f"{c.get('retrieval_method', 'unknown')}; curated KB; heuristic, not a validated classifier",
+                    provenance=f"{c.get('retrieval_method', 'unknown')}; curated KB; heuristic, not a validated classifier"
+                               + ("; history_prior_excluded_from_strength" if c.get("history_prior_applied") else ""),
                     validated=False,
                 )
                 for c in candidates[:3]

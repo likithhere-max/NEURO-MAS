@@ -22,9 +22,19 @@ DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "diseases_c
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
+# Phase 3 (D06): function words carry no symptom information. Before this filter they were counted in BOTH the overlap
+# and the denominator of the lexical score, so "the and of in my a to" matched Alzheimer's, essential tremor and meningitis
+# with score 0.857 (->confidence 0.64) and "I have a tremor in my hand" gave epilepsy 0.286 from the words "a" and "in" alone.
+# Plain English grammar words only -- no medical content, and negations ("no", "not", "without") are deliberately KEPT.
+STOPWORDS = frozenset(
+    "a an the and or but if so as of in on at to for from by with about into over under again then than too very can will just "
+    "i me my mine we us our you your he him his she her it its they them their this that these those is am are was were be been "
+    "being have has had do does did having doing there here when where which who whom what how all any both each few more most "
+    "other some such own same also would should could may might shall".split())
+
 
 def _tokenize(text: str) -> set[str]:
-    return set(_WORD_RE.findall(text.lower()))
+    return set(_WORD_RE.findall(text.lower())) - STOPWORDS
 
 
 class KnowledgeBaseService:

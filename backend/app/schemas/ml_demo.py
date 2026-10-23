@@ -43,6 +43,14 @@ class ParkinsonsVoiceFeaturesIn(BaseModel):
     ppe: float = Field(..., alias="PPE")
 
 
+
+UNCALIBRATED_NOTE = (
+    "Scores are the raw output of a model trained with class_weight='balanced' (an effective 50/50 prior) and never calibrated, "
+    "so they are NOT probabilities of disease/worsening and do not reflect any real-world prevalence. Use them only for relative "
+    "ordering within this demonstration."
+)
+
+
 class ParkinsonsPredictionOut(BaseModel):
     # When `abstained` is true the input was outside the validated domain: NO prediction is made and the
     # prediction fields are null. (Phase 2, C4: an unreliable number is never returned just to fill the schema.)
@@ -53,6 +61,8 @@ class ParkinsonsPredictionOut(BaseModel):
     abstained: bool = False
     domain: dict | None = None
     disclaimer: str
+    probability_calibrated: bool = False   # Phase 3 (D10): class-weighted model scores, not calibrated probabilities
+    probability_note: str = UNCALIBRATED_NOTE
 
 
 class ParkinsonsRiskFeaturesIn(BaseModel):
@@ -96,3 +106,5 @@ class ParkinsonsRiskPredictionOut(BaseModel):
     abstained: bool = False
     domain: dict | None = None
     disclaimer: str
+    probability_calibrated: bool = False   # Phase 3 (D10): class-weighted model scores, not calibrated probabilities
+    probability_note: str = UNCALIBRATED_NOTE

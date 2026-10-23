@@ -12,6 +12,7 @@ clinical triage protocols; see docs/SIMULATED_VS_REAL.md.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 # Deterministic emergency keyword triggers, one entry per primary condition
 # family. Matching is done on normalized (lowercased) observation text.
@@ -195,9 +196,14 @@ _SALT_OR_FORM = re.compile(
 _SPLIT_COMBO = re.compile(r"\s*(?:/|\+|,|;|\band\b|&)\s*")
 
 
+def fold_accents(text: str) -> str:
+    """Remove Latin diacritics (U+0300-U+036F) so 'L\u00e9vodopa' matches 'levodopa'. Other scripts are left untouched."""
+    return "".join(ch for ch in unicodedata.normalize("NFKD", text or "") if not 0x300 <= ord(ch) <= 0x36F)
+
+
 def canonical_drug_names(name: str) -> set[str]:
     """All generic names and drug classes a free-text drug string maps to."""
-    base = normalize(name)
+    base = normalize(fold_accents(name))
     out: set[str] = set()
     if not base:
         return out

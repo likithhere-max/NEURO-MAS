@@ -120,7 +120,8 @@ class PersonalizationAgent(BaseNeuroAgent):
             + "; ".join(reasons or ["baseline plan"])
         )
 
-        warnings: list[str] = []
+        # Phase 3 (D11): 0.7 is a fixed number, not computed from data, and no decision reads it; say so explicitly.
+        warnings: list[str] = ["confidence_is_a_fixed_placeholder_not_a_measure"]
         narrative = await _explain_personalization_with_gemini(plan, education, reasons)
         if narrative:
             reasoning_summary = narrative
