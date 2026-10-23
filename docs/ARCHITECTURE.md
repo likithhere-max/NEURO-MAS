@@ -63,7 +63,7 @@ original 44-section brief in one pass — see `docs/ROADMAP.md` for what's defer
               └──────────────┬─────────────┘
                              v
                  ┌───────────────────────┐
-                 │  CONSENSUS ENGINE     │  C(H) = Σ(w·q·e·s) / Σ(w·q);  D = 1 - max C(H)
+                 │  CONSENSUS ENGINE     │  typed-evidence support INDEX (not a probability)
                  └──────────┬────────────┘
                              v
                  ┌───────────────────────┐
@@ -86,7 +86,11 @@ original 44-section brief in one pass — see `docs/ROADMAP.md` for what's defer
 Section 34 of the brief allows substituting "another orchestration framework" if it's already better
 integrated, and explicitly says not to add frameworks the project doesn't need (section 33). This
 build implements `WorkflowState` (`backend/app/orchestrator/orchestrator.py`) as a plain dataclass
-threaded through an async function over `WORKFLOW_STAGES` groups. It produces the same properties a
+threaded through an async scheduler over the agent dependency graph `AGENT_DEPENDENCIES`
+(`agents/registry.py`): agents run concurrently up to `MAX_AGENT_CONCURRENCY`, each under a timeout
+bounded by the global `WORKFLOW_DEADLINE_SECONDS`; a dependency is an *ordering* edge, not a success
+requirement; a timed-out/failed agent is recorded with a typed status and never silently dropped; the
+deterministic emergency pre-scan runs first and is checkpointed before slow agents start. It produces the same properties a
 LangGraph `StateGraph` would give here — typed state, an inspectable step-by-step trail, resumability
 in principle — without adding a graph-execution dependency to a project whose actual complexity is in
 the *agents and safety logic*, not the control flow between them. If the project later needs
@@ -101,8 +105,8 @@ the graph itself, LangGraph becomes worth its weight — that's listed in `docs/
 | Emergency Escalation | `agents/emergency.py` | 1.00 | Deterministic red-flag phrase match only — no model in the safety-critical path |
 | Neuro-Diagnostic | `agents/diagnostic.py` | 0.65 | Symptom-term overlap against the curated KB; confidence capped at 0.75 |
 | Signal Analysis | `agents/signal_analysis.py` | 0.60 | Threshold checks on pre-extracted wearable summaries; `MODEL_NOT_AVAILABLE` for EEG/EMG/video/voice |
-| Longitudinal / Biomarker | `agents/longitudinal.py` | 0.75 | Baseline-vs-current percent-change trend detection |
-| Medication Safety | `agents/medication.py` | 0.85 | Curated interaction/allergy table lookup; **never** proposes a dose |
+| Longitudinal / Biomarker | `agents/longitudinal.py` | 0.75 | Polarity-aware change classification plus per-metric within-person analysis (`app/ml/longitudinal.py`: Student-t point test, Theil–Sen/Mann–Kendall, self-starting CUSUM/EWMA); methods the data cannot support are `not_assessed`; `insufficient_data` with no history |
+| Medication Safety | `agents/medication.py` | 0.85 | Allergy check and interaction lookup through the `DDISource` interface with seven distinct statuses (absence of a finding is never "safe"); **never** proposes a dose |
 | Knowledge / RAG | `agents/knowledge.py` | 0.80 | Lexical retrieval over the curated, source-tagged disease KB |
 | Risk Stratification | `agents/risk.py` | 0.70 | Weighted-factor `heuristic_score` (fall/seizure/deterioration) |
 | Personalization | `agents/personalization.py` | 0.70 | ΔP-driven monitoring/education plan, tied to this patient's own data |
@@ -114,18 +118,15 @@ shared blackboard), runs consensus, and hands off to the safety engine.
 
 ## 5. Consensus and disagreement
 
-Implements the spec formula directly (`core/consensus.py`):
-
-```
-C(H) = Σ(w_i · q_i · e_i · s_i) / Σ(w_i · q_i)
-D = 1 - max_H C(H)
-```
-
-`w_i` = agent reliability weight, `q_i` = data quality (falls back to the agent's own confidence when
-unavailable), `e_i` = mean evidence strength, `s_i` = the agent's own confidence as its "support" for
-the hypothesis. This is explicitly **not** claimed to be clinically validated — it's a configurable,
-auditable aggregation, per the brief's own caveat. The threshold (`consensus_disagreement_threshold`,
-default 0.4) is an environment-configurable value in `core/config.py`.
+Implemented in `core/consensus.py::compute_evidence_consensus`; full design in `docs/phase2/CONSENSUS_DESIGN.md`.
+Agents contribute **typed, hypothesis-specific evidence** (`core/evidence.py`); a scalar confidence is never
+reinterpreted as support. Only `completed` agents vote; correlated items share an independence group and count once;
+knowledge retrieval is context only; contradiction is explicit. The result is an **uncalibrated support index**
+(`score_kind = "uncalibrated_support_index"`, `calibrated = false`, `probability = null`) that *orders* hypotheses.
+Ties give no leader. `disagreement = 1 − rank(leader)` (1.0 with no unique leader) and gates autonomy together with
+data quality (`consensus_disagreement_threshold`, default 0.4). Today only the diagnostic agent supplies
+rankable evidence, so the "consensus" is that agent's ranking and says so (`independent_sources = 1`). The legacy
+`compute_consensus` formula remains in the module for compatibility only. Nothing here is clinically validated.
 
 ## 6. Safety architecture
 

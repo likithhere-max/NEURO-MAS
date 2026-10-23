@@ -1,5 +1,7 @@
 # NEURO-MAS — Change Summary (Deliverable 10)
 
+> **Point-in-time record (Phase 1 audit, 2026-10-23, commit `1be5e52`).** Parts of this document have been superseded by Phase 2 — see `docs/phase2/IMPLEMENTATION_PLAN.md` and `docs/phase2/OUTSTANDING_ISSUES.md`. Where the two disagree, **the Phase 2 document is current**. Inline notes marked **[Phase 2]** flag changed items.
+
 All changes are **uncommitted** in the working tree (`50 files changed, +1304/−713` for tracked files plus 19 untracked paths). Nothing has been pushed.
 
 ## Public-API / schema / dependency changes (flagged, as requested)

@@ -24,7 +24,7 @@ this build can currently substantiate for each section vs. what needs to be writ
 8. **Personalization engine** — `agents/personalization.py`; use the ΔP formulation from the brief's
    section 36, and cite the actual `personalization_reasons` output as your "proof of
    personalization" example (include a real captured JSON trace from a demo run, not a mockup).
-9. **Consensus mechanism** — `core/consensus.py`; the formula is implemented exactly as specified
+9. **Consensus mechanism** — `core/consensus.py`; the original formula is retained as `compute_consensus`, but the pipeline uses the typed-evidence `compute_evidence_consensus` (an uncalibrated index — report it as such; see `docs/phase2/CONSENSUS_DESIGN.md`)
    (`test_consensus.py` gives you a place to pull worked numeric examples from).
 10. **Autonomous action engine / Safety architecture** — `core/actions.py`, `core/safety.py`; the
     autonomy-level table and the exhaustive safety tests are strong, concrete evidence for this

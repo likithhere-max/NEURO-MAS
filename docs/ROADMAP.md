@@ -8,25 +8,25 @@ pick up.
 
 | Item | Status |
 |---|---|
-| Multi-agent orchestration | **Done** — 10 agents + orchestrator, staged execution, shared blackboard |
+| Multi-agent orchestration | **Done (prototype)** — 10 registered agents (9 scheduled), dependency-graph orchestrator with deadlines and typed outcomes, shared upstream view |
 | Neurological disease knowledge | **Done (partial)** — 10 conditions fully curated and source-tagged; 356 more seed rows in `disease_seed_275.csv` are names-only, pending population |
-| Patient profile | **Done** — `PatientState` Pydantic model + persisted SQLAlchemy tables |
+| Patient profile | **Done** — `PatientState` Pydantic model + Supabase tables (RLS isolation unverified) |
 | Personalized assessment | **Done** — Personalization Agent output is provably patient-specific (see `personalization_reasons`) |
 | Agent collaboration | **Done** — structured `AgentMessage`s, shared upstream results, visible in UI |
-| Consensus | **Done** — weighted consensus + disagreement formula, configurable threshold |
+| Consensus | **Done as an uncalibrated index** — typed-evidence ranking, contradiction, ties; not a probability; one rankable voter in practice (`docs/phase2/CONSENSUS_DESIGN.md`) |
 | Risk assessment | **Done** — heuristic, explicitly labeled as such |
 | RAG | **Done (lexical only)** — real retrieval, real citations, not embedding-based yet |
 | Alerts | **Done** — Alert Center, acknowledge flow |
-| Audit trail | **Done** — every agent run, consensus computation, and action proposal logged to `AuditEvent` |
+| Audit trail | **Done** — every agent run, consensus computation, and action proposal logged as audit events |
 | Working UI | **Done** — patient dashboard showing agent activity, consensus, personalization, actions, alerts, timeline |
 | FastAPI backend | **Done** — full route set per the brief's API sketch |
-| Database | **Done** — SQLite by default, Postgres-portable |
+| Database | **Done** — Supabase Postgres (the SQLAlchemy/SQLite layer was removed); SQL migrations in `backend/scripts/` are unexecuted |
 
 ## SHOULD HAVE — status
 
 | Item | Status |
 |---|---|
-| Longitudinal analytics | **Partial** — trend detection exists; no charting/visualization of trends over time yet |
+| Longitudinal analytics | **Partial** — within-person statistical analysis exists and was characterised by simulation (`docs/phase2/MATHEMATICAL_VALIDATION.md`); no real-data evaluation; no charting yet |
 | Wearable ingestion | **Partial** — accepts summary metrics (tremor amplitude, gait speed); no raw-stream ingestion pipeline |
 | FHIR adapter | **Not started** — see "Next steps" below |
 | Graph knowledge (Neo4j) | **Not started** — deliberately deferred; the brief itself says not to add it unless it "genuinely improves the project," and a 10-condition KB doesn't yet need graph traversal over a relational/JSON store |

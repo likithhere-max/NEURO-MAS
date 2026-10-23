@@ -1,11 +1,13 @@
 # NEURO-MAS — ML Validation Report (Deliverable 4)
 
+> **Point-in-time record (Phase 1 audit, 2026-10-23, commit `1be5e52`).** Parts of this document have been superseded by Phase 2 — see `docs/phase2/ML_VALIDATION_RESULTS.md` and `docs/phase2/OUTSTANDING_ISSUES.md`. Where the two disagree, **the Phase 2 document is current**. Inline notes marked **[Phase 2]** flag changed items.
+
 ## 0. Bottom line
 **No real-data validation result exists in this report.** The sandbox could not reach UCI,
 HuggingFace or GitHub, so neither training dataset could be downloaded. I therefore did **not** re-measure
 either model's performance. What I did deliver is (a) an audit of how the shipped numbers were produced,
 (b) a validation harness that fixes the methodological problems, and (c) artifact integrity controls.
-Please run the harness locally (commands below) and replace section 4 with the real output.
+**[Phase 2]** The harness was rewritten (`ml/validation/validate_models.py`; protocol in `docs/phase2/ML_EXPERIMENT_PROTOCOL.md`); the real-data run is still **NOT RUN (BLOCKED)**. The commands in section 4 are superseded by the Phase 2 protocol.
 
 Anything the harness printed during my session came from **synthetic** data I generated only to prove the
 code runs. Those numbers are meaningless and must not be quoted.
@@ -27,7 +29,7 @@ code runs. Those numbers are meaningless and must not be quoted.
 | ML6 | Predictive value ignores prevalence. A 75 %-PD training set ≠ a screening population. | PPV in a 1–5 % population is far lower than in the study. | Harness: PPV/NPV at π = 1, 5, 20, 75 %. |
 | ML7 | Risk model uses `test_time` and `baseline_total_UPDRS` as features. | The label is "UPDRS rose since baseline"; time-since-baseline and baseline severity (regression to the mean: patients starting high can only drop, those starting low can rise) may be able to predict it with **no voice information at all** (hypothesis — this is exactly what the ablation tests; I have not measured it). | Harness ablations: voice-only, time-only, baseline-only, time+baseline vs FULL. Result BLOCKED. |
 | ML8 | Risk label threshold (3.0 UPDRS) is arbitrary (the metadata itself says so). | — | Documented. |
-| ML9 | Distribution shift: studio-quality sustained vowels (disease model) and a telemonitoring home device (risk model) vs any phone/browser recording. | Demo endpoint accepts hand-typed feature values; out-of-distribution inputs still return confident outputs (reproduced). | Input NaN/inf rejected; **no OOD detector** — OPEN. |
+| ML9 | Distribution shift: studio-quality sustained vowels (disease model) and a telemonitoring home device (risk model) vs any phone/browser recording. | Demo endpoint accepts hand-typed feature values; out-of-distribution inputs still return confident outputs (reproduced). | Input NaN/inf rejected; ~~no OOD detector~~ **[Phase 2]** OOD/abstention added (`app/ml/ood.py`); real-data error rates unmeasured. |
 | ML10 | Artefact reproducibility: trained under scikit-learn 1.9.0 while the repo pinned 1.9.1; no version/hash. | Pickle loading across versions can silently change behaviour. | `MANIFEST.json` (sha256) + pin `>=1.9.0,<1.10`; retrain recommended. |
 | ML11 | Pickle deserialisation = code execution. | Supply-chain risk. | SHA-256 check before `joblib.load`; failure ⇒ 503. |
 | ML12 | Same-subject near-duplicate recordings (roughly 6 per subject in the disease set). | Random k-fold would leak; LOSO (used) does not. | Verified by reading the code: LOSO by `subject_id` parsed from `phon_R01_S##_#`. Harness re-checks parsing. |

@@ -105,3 +105,46 @@ def test_real_kb_offline_scan_runs_and_flags_traceability(tmp_path):
     iss = ki.structural_issues(kb)
     assert sum(1 for i in iss if i["kind"] == "no_claim_level_traceability") == len(kb["diseases"])
     assert not [i for i in iss if i["kind"] in ("no_source_url", "invalid_or_non_https_url")]   # shipped KB is well-formed
+
+
+# ---- positive control: the REAL fetch path against a REAL local HTTP server (no stubs) ----
+def _serve():
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/ok":
+                self.send_response(200); self.end_headers(); self.wfile.write(b"hi")
+            elif self.path == "/gone":
+                self.send_response(404); self.end_headers()
+            elif self.path == "/moved":
+                self.send_response(301); self.send_header("Location", "/ok"); self.end_headers()
+            else:
+                self.send_response(500); self.end_headers()
+        do_HEAD = do_GET
+
+        def log_message(self, *a): pass
+
+    srv = HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+@pytest.mark.asyncio
+async def test_default_fetch_distinguishes_live_dead_and_unreachable_against_a_real_server():
+    srv = _serve()
+    try:
+        base = f"http://127.0.0.1:{srv.server_address[1]}"
+        results = {}
+        for path in ("/ok", "/gone", "/moved"):
+            r = await ki.default_fetch(base + path, 5.0)
+            results[path] = ki.classify(base + path, r)[0]
+        assert results["/ok"] == "live"
+        assert results["/gone"] == "dead"
+        assert results["/moved"] in ("live", "redirected")
+    finally:
+        srv.shutdown()
+    # server is now closed: connection refused must be 'unreachable' (unverifiable), never 'dead'
+    r = await ki.default_fetch(base + "/ok", 2.0)
+    assert ki.classify(base + "/ok", r)[0] == "unreachable"

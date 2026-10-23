@@ -1,5 +1,7 @@
 # NEURO-MAS — Automated Test Report (Deliverable 6)
 
+> **Point-in-time record (Phase 1 audit, 2026-10-23, commit `1be5e52`).** Parts of this document have been superseded by Phase 2 — see `docs/phase2/INTEGRATION_TEST_REPORT.md` and `docs/phase2/OUTSTANDING_ISSUES.md`. Where the two disagree, **the Phase 2 document is current**. Inline notes marked **[Phase 2]** flag changed items.
+
 All numbers below were produced by commands run in this session (2026-10-23, Python 3.13 venv,
 Linux sandbox, no network access to Supabase/Gemini).
 

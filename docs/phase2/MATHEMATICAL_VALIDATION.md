@@ -17,9 +17,9 @@ Reproduce everything in this file with the commands in RUN_AND_REPRODUCTION.md.
 | Mann–Kendall (+ties, +lag-1 variance correction) | same | monotone-trend test | hand examples incl. tie correction; sign symmetry | simulation (§3) | None |
 | Quesenberry Q (self-starting standardisation) | same | z-like statistic of each reading vs. its own history | hand example; **standard-normal & uncorrelated under null** test; location-scale invariance property | simulation (§3) | None |
 | Tabular CUSUM (k = 0.5, h = 5) / EWMA (λ = 0.2, L = 3) on Q | same | sequential shift detection | hand examples | simulation (§3) | None |
-| OOD / abstention | `app/ml/ood.py` | contract, physical bounds, algebraic identities, marginal range, optional Mahalanobis | `test_ood.py` (13 tests incl. properties) | **not measured** on real data (no data) | None |
+| OOD / abstention | `app/ml/ood.py` | contract, physical bounds, algebraic identities, marginal range, optional Mahalanobis | `test_ood.py` (18 cases incl. properties) | **not measured** on real data (no data) | None |
 | Evidence consensus | `app/core/consensus.py` | ordering of hypotheses | `test_consensus_evidence.py`, `test_math_properties.py` | — | None; **not a probability** (CONSENSUS_DESIGN.md) |
-| Evaluation kit (metrics, CV, bootstrap, permutation) | `ml/evalkit/*` | model-evaluation statistics | reference values, leakage guards (`test_ml_evalkit.py`, 30+ tests) | — | n/a |
+| Evaluation kit (metrics, CV, bootstrap, permutation) | `ml/evalkit/*` | model-evaluation statistics | reference values, leakage guards (`test_ml_evalkit.py`, 26 tests) | — | n/a |
 | Risk score (agent) | `app/agents/risk.py` | weighted additive heuristic | unit tests | none | **Stays a heuristic.** Its output is labelled as such; it is not a calibrated risk. |
 
 ## 2. Principles applied

@@ -1,5 +1,7 @@
 # NEURO-MAS — Mathematical Specification (Deliverable 3)
 
+> **Point-in-time record (Phase 1 audit, 2026-10-23, commit `1be5e52`).** Parts of this document have been superseded by Phase 2 — see `docs/phase2/MATHEMATICAL_VALIDATION.md` and `docs/phase2/OUTSTANDING_ISSUES.md`. Where the two disagree, **the Phase 2 document is current**. Inline notes marked **[Phase 2]** flag changed items.
+
 Every formula below is implemented in the named function and covered by the named tests.
 "Verified" means *the code computes this formula* (hand calculation reproduced by a test). It does
 **not** mean the formula is clinically valid; that is stated per section.
@@ -7,6 +9,8 @@ Every formula below is implemented in the named function and covered by the name
 ---
 
 ## 1. Hypothesis consensus — `app/core/consensus.py::compute_consensus`
+
+> **[Phase 2]** The orchestrator now uses `compute_evidence_consensus` (typed, independent evidence; uncalibrated support index; no percentage). The text below documents the *legacy* function that remains for compatibility. See `docs/phase2/CONSENSUS_DESIGN.md`.
 
 For hypothesis H with voting-agent set V(H):
 

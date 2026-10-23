@@ -3,7 +3,7 @@
 **A Multi-Agent Collaborative System for Autonomous and Personalized Neurological Healthcare**
 
 A prototype platform where specialized neurological AI agents independently analyze patient data,
-communicate structured findings, resolve disagreement through a weighted consensus engine, and
+communicate structured findings, rank competing hypotheses with a typed-evidence consensus engine (an uncalibrated index, not a probability), and
 propose bounded, safety-gated autonomous actions (reminders, monitoring, caregiver/clinician
 notification, emergency escalation) — never a restricted action like a medication change, which
 always requires clinician authorization.
@@ -20,17 +20,19 @@ prototype in this build, and `docs/ARCHITECTURE.md` for the full system design.
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
-# configure backend/.env (Supabase + Gemini keys; ENVIRONMENT, CLINICIAN_INVITE_CODE, CORS_ORIGINS) -- see docs/audit/RUN_AND_REPRODUCTION.md
+# configure backend/.env (Supabase + Gemini keys; ENVIRONMENT, CLINICIAN_INVITE_CODE, CORS_ORIGINS) -- see docs/phase2/RUN_AND_REPRODUCTION.md
 uvicorn app.main:app --reload --port 8000
 ```
 
 API docs: http://localhost:8000/docs
 
-Run the test suite (226 passing + 4 live-Supabase tests skipped by default; see docs/audit/TEST_REPORT.md):
+Run the test suite (551 passing, 26 skipped — live Supabase/Gemini and RLS tests need a test project; see docs/phase2/INTEGRATION_TEST_REPORT.md):
 
 ```bash
-python -m pytest tests -q --cov=app
+python -m pytest tests -q --cov=app --cov=ml
 ```
+
+Frontend: `cd frontend && npm test` (Vitest) and `npm run build && npm run e2e` (browser smoke against a **mocked** API).
 
 ### Frontend (Next.js dashboard)
 
@@ -45,12 +47,18 @@ Open http://localhost:3000, register as a **clinician** (needs `CLINICIAN_INVITE
 emergency / Parkinson's deterioration / routine check-in), and click **Trigger assessment** to watch
 the agents run, reach (or fail to reach) consensus, and propose safety-gated actions.
 
+## Status (read before using)
+
+This is a research prototype. Nothing in it is clinically validated, and it must not be used with real patients.
+The current, honest status of every model, threshold, integration and open issue is in
+[`docs/phase2/OUTSTANDING_ISSUES.md`](docs/phase2/OUTSTANDING_ISSUES.md); start there.
+
 ## What to look at first
 
 - `backend/app/orchestrator/orchestrator.py` — the closed loop: intake → agents → consensus →
   safety → action → audit
 - `backend/app/core/safety.py` — the single authority on what's allowed to happen autonomously
-- `backend/app/core/consensus.py` — the weighted-consensus/disagreement math
+- `backend/app/core/consensus.py` — the typed-evidence consensus (support index, contradiction, ties)
 - `backend/app/agents/` — the 10 specialized agents
 - `backend/tests/test_safety.py` — proof the safety engine can't be bypassed by confidence, emergency
   flags, or an active-emergency workflow reclassifying unrelated actions
@@ -74,7 +82,8 @@ NEURO-MAS/
 ├── frontend/                # Next.js 15 + Tailwind dashboard
 └── docs/
     ├── ARCHITECTURE.md
-    ├── audit/               # 2026-10 engineering audit: findings, maths, security, tests, how to reproduce
+    ├── audit/               # Phase 1 audit (point-in-time record; see phase2 for current status)
+    ├── phase2/              # CURRENT: plan, maths validation, ML protocol/results, consensus design, security & privacy, test report, open issues
     ├── ROADMAP.md
     ├── SIMULATED_VS_REAL.md
     └── RESEARCH_PAPER_OUTLINE.md

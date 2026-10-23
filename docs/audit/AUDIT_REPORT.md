@@ -1,5 +1,7 @@
 # NEURO-MAS — Repository Audit Report (Deliverable 1)
 
+> **Point-in-time record (Phase 1 audit, 2026-10-23, commit `1be5e52`).** Parts of this document have been superseded by Phase 2 — see `docs/phase2/IMPLEMENTATION_PLAN.md` and `docs/phase2/OUTSTANDING_ISSUES.md`. Where the two disagree, **the Phase 2 document is current**. Inline notes marked **[Phase 2]** flag changed items.
+
 Audit date: 2026-10-23. Scope: backend, ML artifacts, agents, security, frontend↔backend integration.
 Method: read the existing code, reproduce each suspected defect with a script **against the original
 code first**, fix it, then re-run. Nothing was rebuilt; the public API shape, the DB schema and the
@@ -64,7 +66,7 @@ myself (flagged below). Real-data ML validation was BLOCKED (see `ML_VALIDATION_
 | M5 | Knowledge agent only does URL lookup/retrieval; citation liveness/accuracy unchecked; `last_verified`/`review_status` may be absent | UI made defensive; liveness unchecked. |
 | M6 | No idempotency on `POST /workflows` (double-click ⇒ duplicate workflows/alerts) | OPEN |
 | M7 | Docstring claimed agents run "in parallel"; the orchestrator is sequential (9 stages) | Doc corrected; latency = sum of agents. |
-| M8 | `scripts/test_rls_deny.py` runs against production Supabase with hard-coded UUID; `TestPassword123!` hard-coded in 7 scripts of a **public** repo; test account `apitest@example.com` exists | OPEN — rotate/disable the test account(s); move creds to env. |
+| M8 | `scripts/test_rls_deny.py` runs against production Supabase with hard-coded UUID; the shared test-account password (literal omitted; it remains in git history) hard-coded in 7 scripts of a **public** repo; test account `apitest@example.com` exists | OPEN — rotate/disable the test account(s); move creds to env. |
 | M9 | CORS: `"*"` default combined with `allow_credentials=True` | FIXED: credentials only with explicit origins; warning in non-dev. |
 | M10 | Dead SQLAlchemy scaffolding (`app/db`, `app/seed`), `create_all` on import, unused/vulnerable deps (python-jose, passlib, bcrypt…) and committed SQLite test DB | Removed; `requirements.txt` rewritten (see Change Summary). |
 
