@@ -1,0 +1,26 @@
+# Render Blueprint: New + -> Blueprint -> pick this repo.  Secrets (sync: false) are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: neuro-mas-api
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    plan: free              # free instances sleep after ~15 min idle (first request then takes ~30-60 s). Use "starter" for the review day if you can.
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CLINICIAN_INVITE_CODE
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false         # e.g. ["https://YOUR-SITE.netlify.app"]

@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+*.db
+tests
+scripts
+ml/data/cache
+ml/validation/results
+.pytest_cache
+.hypothesis
