@@ -90,6 +90,13 @@ class Settings(BaseSettings):
     # ENVIRONMENT=development. Default False: signup goes through Supabase's email-confirmation flow.
     auto_confirm_email: bool = False
     auth_rate_limit_per_minute: int = 10
+    # Per-authenticated-user limits for expensive endpoints (0 disables).
+    workflow_rate_limit_per_minute: int = 6
+    chat_rate_limit_per_minute: int = 20
+    # Number of trusted reverse proxies in front of the API (0 = ignore X-Forwarded-For). Wrong values let clients spoof IPs.
+    trusted_proxy_count: int = 0
+    # Optional shared store (redis://...). Empty = per-process in-memory limiter.
+    rate_limit_redis_url: str = ""
     # --- CORS ---
     # "*" added 2026-09-02 as a same-day-review convenience: the frontend is
     # being hosted on Netlify (URL not known/fixed yet) and the backend is

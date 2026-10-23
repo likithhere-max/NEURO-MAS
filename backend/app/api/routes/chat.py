@@ -9,6 +9,8 @@ from app.services.auth import get_current_user
 from app.services.chat_assistant import answer_patient_question
 from app.services.repository import build_case_context
 
+from app.core.ratelimit import rate_limit_user  # noqa: E402
+
 router = APIRouter(prefix="/patients", tags=["chat"])
 
 
@@ -28,7 +30,8 @@ def get_chat_history(patient_id: str, user: dict = Depends(get_current_user)):
     return result.data
 
 
-@router.post("/{patient_id}/chat")
+@router.post("/{patient_id}/chat",
+             dependencies=[Depends(rate_limit_user("chat", "chat_rate_limit_per_minute"))])
 async def send_chat_message(
     patient_id: str,
     payload: ChatMessageIn,

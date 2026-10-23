@@ -26,6 +26,8 @@ from app.services.symptom_extraction import (
     extracted_profile_to_symptom_ins,
 )
 
+from app.core.ratelimit import rate_limit_user  # noqa: E402
+
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 logger = logging.getLogger("neuromas.workflows")
 
@@ -93,7 +95,8 @@ def _persist_or_degrade(client, workflow_state) -> bool:
         raise HTTPException(500, "could not save the assessment; please retry")
 
 
-@router.post("/neurological-assessment/{patient_id}")
+@router.post("/neurological-assessment/{patient_id}",
+             dependencies=[Depends(rate_limit_user("workflow", "workflow_rate_limit_per_minute"))])
 async def trigger_neurological_assessment(
     patient_id: str,
     payload: WorkflowTriggerIn,
@@ -161,7 +164,8 @@ async def trigger_neurological_assessment(
     return _serialize_workflow(workflow_state)
 
 
-@router.post("/symptom-assessment/{patient_id}")
+@router.post("/symptom-assessment/{patient_id}",
+             dependencies=[Depends(rate_limit_user("workflow", "workflow_rate_limit_per_minute"))])
 async def trigger_symptom_assessment(
     patient_id: str,
     payload: SymptomAssessmentIn,
