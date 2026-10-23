@@ -50,8 +50,22 @@ def _git(*args: str) -> str | None:
         return None
 
 
-def run_context(argv: list[str]) -> dict:
-    dirty = _git("status", "--porcelain")
+def _dirty(out_dir: Path | None) -> str | None:
+    """`git status --porcelain`, ignoring the run's own output directory (its files are produced by this very run and must not
+    make the manifest report an uncommitted *source* tree).  Anything else uncommitted still counts."""
+    top = _git("rev-parse", "--show-toplevel")
+    spec = ["--", ":(top)."]
+    if out_dir is not None and top:
+        try:
+            rel = Path(out_dir).resolve().relative_to(Path(top).resolve())
+            spec.append(f":(top,exclude){rel.as_posix()}")
+        except ValueError:
+            pass
+    return _git("status", "--porcelain", *spec)
+
+
+def run_context(argv: list[str], out_dir: Path | None = None) -> dict:
+    dirty = _dirty(out_dir)
     return {"workflow_version": WORKFLOW_VERSION, "git_commit": _git("rev-parse", "HEAD"), "git_dirty": None if dirty is None else bool(dirty),
             "argv": argv, "python_executable": sys.executable, "environment": P.env_info(), "protocol_id": P.PROTOCOL["id"],
             "protocol_sha256": P.PROTOCOL_SHA256, "seed_base": P.PROTOCOL["seed_base"]}
@@ -167,7 +181,7 @@ def run_workflow(*, disease_csv: str | None = None, risk_csv: str | None = None,
     st = {e["status"] for e in exps.values()}
     overall = (COMPLETED if st == {COMPLETED} else FAILED if FAILED in st else REFUSED if REFUSED in st else NOT_RUN if st == {NOT_RUN} else "INCOMPLETE")
     code = {COMPLETED: 0, FAILED: 1, REFUSED: 3}.get(overall, 2)
-    manifest = {"manifest_schema": "neuro-mas-experiment-manifest/1", **run_context(argv or []), "seeds": seeds, "n_boot": n_boot, "n_perm": n_perm,
+    manifest = {"manifest_schema": "neuro-mas-experiment-manifest/1", **run_context(argv or [], out_dir), "seeds": seeds, "n_boot": n_boot, "n_perm": n_perm,
                 "fast": fast, "overall_status": overall, "exit_code": code, "experiments": exps,
                 "dataset_manifest": DM.load_manifest(manifest_path)["overall_status"], "clinically_validated": False}
     report_note = None

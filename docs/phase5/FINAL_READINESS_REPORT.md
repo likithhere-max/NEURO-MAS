@@ -49,10 +49,10 @@ Statistical planning (not evidence): `STATISTICAL_EVIDENCE_REPORT.md` and `backe
 | Run | Result |
 |---|---|
 | Historical (Phase 4A, `8e4f4d3`, clean worktree re-run) | 764 passed, 26 skipped |
-| Phase 5 only (`tests/phase5`, before the doc-number tests) | 92 passed, 0 skipped |
-| **Phase 5 full backend suite** | **863 passed, 26 skipped, 79 warnings** (227.9 s) |
+| Phase 5 only (`tests/phase5`, first run, before the doc-number and dirty-check tests) | 92 passed, 0 skipped |
+| **Phase 5 full backend suite** | **864 passed, 26 skipped, 79 warnings** (225.6 s) |
 
-Difference from the historical run: +99 passing tests (the Phase 5 tests); **the 26 skips are the live-service tests** (22 RLS tests with no
+Difference from the historical run: +100 passing tests (the Phase 5 tests); **the 26 skips are the live-service tests** (22 RLS tests with no
 Supabase test project, 4 live Supabase/Gemini API tests; listed with `-rs` in the Phase 5 run; the baseline run was made without `-rs`, so
 its skip list was not printed, but the count is identical). No pytest test depends on the real UCI files. No test was weakened, no assertion removed,
 no acceptance criterion changed, no warning suppressed.
@@ -68,7 +68,7 @@ collection of a local `.hypothesis` directory (environmental). The per-instance 
 
 ```
 cd backend
-python -m pytest -q -p no:cacheprovider                                   # 863 passed, 26 skipped
+python -m pytest -q -p no:cacheprovider                                   # 864 passed, 26 skipped
 PYTHONPATH=. python -m ml.validation.dataset_manifest status             # exits 2 (unpinned)
 PYTHONPATH=. python -m ml.validation.workflow run --out ml/validation/results/phase5/workflow_no_data   # exits 2 (NOT_RUN)
 PYTHONPATH=. python -m ml.validation.phase4a artifacts --out <dir>       # deterministic no-data audit

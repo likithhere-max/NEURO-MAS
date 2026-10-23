@@ -207,3 +207,24 @@ def test_a_number_that_is_not_a_registered_claim_is_rejected(full_run):
     claims = json.loads((out / "GENERATED_RESULTS.claims.json").read_text())
     with pytest.raises(R.ReportMismatch):
         R.verify(md.replace(R.END, "| invented | 0.987 |\n" + R.END), claims, out)
+
+
+def test_dirty_check_ignores_only_the_runs_own_output_directory(tmp_path, monkeypatch):
+    from ml.validation import workflow as W
+    calls = []
+
+    def fake_git(*args):
+        calls.append(args)
+        if args == ("rev-parse", "--show-toplevel"):
+            return str(tmp_path)
+        return "M other_file.py"
+
+    monkeypatch.setattr(W, "_git", fake_git)
+    out = tmp_path / "results" / "run1"
+    out.mkdir(parents=True)
+    assert W._dirty(out) == "M other_file.py"                      # other uncommitted changes still count
+    status_call = [c for c in calls if c[0] == "status"][-1]
+    assert ":(top,exclude)results/run1" in status_call
+    calls.clear()
+    W._dirty(tmp_path.parent / "elsewhere")                         # outside the repository: nothing is excluded
+    assert not any(a.startswith(":(top,exclude)") for c in calls for a in c)
