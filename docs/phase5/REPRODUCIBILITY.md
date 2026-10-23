@@ -86,5 +86,7 @@ The no-data artifact audit was re-run in Phase 5 and is identical to the committ
 * Reported historical figures cannot be reproduced without the data.
 * Seeds are fixed (base 20261023, five seeds); results from different seeds are split-sensitivity checks, not replications.
 * Bootstrap and permutation counts: 2000 and 200 (registered).
-* The workflow's `git_dirty` flag is true when it is run with uncommitted changes; a manifest from a dirty tree is not a clean
-  provenance record.
+* The workflow's `git_dirty` flag is true when it is run with uncommitted changes other than its own output directory; a manifest
+  from a dirty tree is not a clean provenance record. The committed no-data manifest
+  (`backend/ml/validation/results/phase5/workflow_no_data/`) was produced at commit `52fbe22` with `git_dirty: false`; it records
+  sandbox paths and the sandbox interpreter, which are provenance, not configuration.
