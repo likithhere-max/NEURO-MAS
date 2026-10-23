@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { actionStatusLabel, actionStatusTone } from "@/lib/labels";
+
+const TONE_BADGE: Record<string, string> = { ok: "badge-ok", warn: "badge-warn", critical: "badge-critical", info: "badge-info" };
 
 const RISK_BADGE: Record<string, string> = {
   none: "badge-ok",
@@ -9,15 +12,6 @@ const RISK_BADGE: Record<string, string> = {
   medium: "badge-warn",
   high: "badge-high",
   restricted: "badge-critical",
-};
-
-// "executed" is only shown when the backend confirmed delivery or a clinician approved. A permitted action
-// with no notification channel configured stays "proposed" -- say so instead of implying it was sent.
-const STATUS_LABEL: Record<string, string> = {
-  proposed: "proposed · not sent",
-  pending_approval: "awaiting clinician approval",
-  executed: "executed",
-  rejected: "rejected",
 };
 
 export default function ActionsPanel({ actions, role, onChanged }: { actions: any[]; role: string | null; onChanged: () => void }) {
@@ -49,7 +43,7 @@ export default function ActionsPanel({ actions, role, onChanged }: { actions: an
               <div className="text-sm font-medium">{a.action_type.replaceAll("_", " ")}</div>
               <div className="flex items-center gap-2">
                 <span className={`badge ${RISK_BADGE[a.risk_level] || "badge-info"}`}>L{a.autonomy_level} · {a.risk_level}</span>
-                <span className="badge badge-info">{STATUS_LABEL[a.status] || a.status.replaceAll("_", " ")}</span>
+                <span className={`badge ${TONE_BADGE[actionStatusTone(a.status)]}`}>{actionStatusLabel(a.status)}</span>
               </div>
             </div>
             <div className="text-xs text-neuro-muted mt-1">{a.reason}</div>

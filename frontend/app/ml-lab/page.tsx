@@ -17,6 +17,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, loadSession } from "@/lib/api";
+import { friendlyMessage } from "@/lib/errors";
+import AbstainNotice from "@/components/AbstainNotice";
 
 type FeatureField = { alias: string; label: string; parkinsons: number; healthy: number };
 
@@ -164,7 +166,7 @@ export default function MLLabPage() {
     try {
       setVoiceResult(await api.mlClassify(voiceValues));
     } catch (e: any) {
-      setVoiceError(e.message);
+      setVoiceError(friendlyMessage(String(e?.message ?? "")));
     } finally {
       setVoiceRunning(false);
     }
@@ -177,7 +179,7 @@ export default function MLLabPage() {
     try {
       setRiskResult(await api.mlRiskClassify(riskValues));
     } catch (e: any) {
-      setRiskError(e.message);
+      setRiskError(friendlyMessage(String(e?.message ?? "")));
     } finally {
       setRiskRunning(false);
     }
@@ -255,9 +257,13 @@ export default function MLLabPage() {
           {voiceRunning ? "Running…" : "Run classifier"}
         </button>
 
-        {voiceError && <div className="text-neuro-critical text-sm">{voiceError}</div>}
+        {voiceError && <div role="alert" className="text-neuro-critical text-sm">{voiceError}</div>}
 
-        {voiceResult && (
+        {voiceResult && voiceResult.abstained && (
+          <div className="border-t border-neuro-border pt-4"><AbstainNotice domain={voiceResult.domain} /></div>
+        )}
+
+        {voiceResult && !voiceResult.abstained && (
           <div className="border-t border-neuro-border pt-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className={`badge ${voiceResult.predicted_label === "parkinsons" ? "badge-high" : "badge-ok"}`}>
@@ -330,13 +336,17 @@ export default function MLLabPage() {
           {riskRunning ? "Running…" : "Run classifier"}
         </button>
 
-        {riskError && <div className="text-neuro-critical text-sm">{riskError}</div>}
+        {riskError && <div role="alert" className="text-neuro-critical text-sm">{riskError}</div>}
 
-        {riskResult && (
+        {riskResult && riskResult.abstained && (
+          <div className="border-t border-neuro-border pt-4"><AbstainNotice domain={riskResult.domain} /></div>
+        )}
+
+        {riskResult && !riskResult.abstained && (
           <div className="border-t border-neuro-border pt-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className={`badge ${riskResult.predicted_label === "worsening" ? "badge-high" : "badge-ok"}`}>
-                predicted: {riskResult.predicted_label.replace(/_/g, " ")}
+                predicted: {(riskResult.predicted_label ?? "").replace(/_/g, " ")}
               </span>
             </div>
             <ProbabilityBar label="Worsening" value={riskResult.probability_worsening} tone="critical" />

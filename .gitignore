@@ -16,3 +16,4 @@ backend/ml/data/cache/
 .pytest_cache/
 .ruff_cache/
 backend/ml/simulation/__pycache__/
+*.tsbuildinfo

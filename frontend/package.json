@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "e2e": "bash e2e/run.sh"
   },
   "dependencies": {
     "next": "15.5.23",
@@ -14,12 +17,17 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
-    "typescript": "5.5.4",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.1.0",
     "@types/node": "20.14.0",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
-    "tailwindcss": "3.4.7",
+    "@vitejs/plugin-react": "4.3.4",
+    "autoprefixer": "10.4.19",
+    "jsdom": "25.0.1",
     "postcss": "8.5.26",
-    "autoprefixer": "10.4.19"
+    "tailwindcss": "3.4.7",
+    "typescript": "5.5.4",
+    "vitest": "2.1.9"
   }
 }
