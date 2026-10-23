@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.core.supabase_client import get_supabase_admin_client, get_authed_client
 from app.schemas.api import (
@@ -79,6 +80,32 @@ def create_patient(payload: PatientCreate, user: dict = Depends(get_current_user
     # lookup decision that hasn't been made yet. Use POST /patients/{id}/conditions
     # below for now, which takes explicit, unambiguous fields.
     return PatientOut(id=p["id"], full_name=p["full_name"], age=p["age"], sex=p["sex"], conditions=[])
+
+
+class AIConsentIn(BaseModel):
+    granted: bool
+
+
+@router.put("/{patient_id}/ai-consent")
+def set_ai_consent(patient_id: str, payload: AIConsentIn, user: dict = Depends(get_current_user)):
+    """
+    Record (or withdraw) the patient's consent to send their de-identified text to an external language model
+    (see app/core/privacy.py). Runs as the caller under RLS: it succeeds only for rows the caller may update.
+    Withdrawal takes effect on the next request; data already sent cannot be recalled.
+    Requires scripts/migration_phase2_privacy.sql to have been applied (the columns do not exist before that).
+    """
+    client = get_authed_client(user["_access_token"])
+    from datetime import datetime, timezone
+    row = {"external_ai_consent": payload.granted,
+           "external_ai_consent_at": datetime.now(timezone.utc).isoformat(),
+           "external_ai_consent_by": user["sub"]}
+    try:
+        res = client.table("patients").update(row).eq("id", patient_id).execute()
+    except Exception:
+        raise HTTPException(500, "could not record consent (is the privacy migration applied?)")
+    if not res.data:
+        raise HTTPException(404, "patient not found")      # also what RLS-filtered rows look like
+    return {"patient_id": patient_id, "external_ai_consent": payload.granted, "recorded_at": row["external_ai_consent_at"]}
 
 
 @router.get("/{patient_id}", response_model=PatientOut)

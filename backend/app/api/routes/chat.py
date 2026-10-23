@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core import privacy
 from app.core.supabase_client import get_authed_client
 from app.schemas.chat import ChatMessageIn
 from app.services.auth import get_current_user
@@ -61,9 +62,13 @@ async def send_chat_message(
 
     context = build_case_context(client, patient_id, patient=patient)
 
-    result = await answer_patient_question(
-        question=payload.message, context=context, history=history
-    )
+    with privacy.processing_scope(purpose="patient_chat", consent=bool(patient.get("external_ai_consent", False)),
+                                  identifiers=[patient.get("full_name")]) as pctx:
+        result = await answer_patient_question(
+            question=payload.message, context=context, history=history
+        )
+    if any(not e["allowed"] for e in pctx.events):
+        result.setdefault("warnings", []).append("external_ai_blocked_by_privacy_policy_used_local_fallback")
 
     rows_to_insert = [
         {"patient_id": patient_id, "role": "user", "content": payload.message},

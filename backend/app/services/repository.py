@@ -139,6 +139,8 @@ def build_patient_state(client: Client, patient: dict) -> PatientState:
         # unless that column is added back -- flagged here rather than guessed.
         clinician_constraints=ClinicianConstraints(restricted_actions=[]),
     )
+    state.external_ai_consent = bool(patient.get("external_ai_consent", False))
+    state.redaction_identifiers = [n for n in [patient.get("full_name")] if n]
     state.data_completeness = state.compute_completeness()
     return state
 

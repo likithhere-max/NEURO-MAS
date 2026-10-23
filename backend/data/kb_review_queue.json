@@ -1,0 +1,278 @@
+{
+ "generated": "2026-10-23T09:24:10.374646+00:00",
+ "mode": "offline",
+ "link_summary": {},
+ "queue": [
+  {
+   "id": "27118952d140",
+   "disease_id": "NEURO-AD-003",
+   "name": "Alzheimer's disease",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "872bf419ad63",
+   "disease_id": "NEURO-AD-003",
+   "name": "Alzheimer's disease",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "2f88ddc2ef20",
+   "disease_id": "NEURO-ALS-007",
+   "name": "Amyotrophic lateral sclerosis",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "f260e9f5e1a7",
+   "disease_id": "NEURO-ALS-007",
+   "name": "Amyotrophic lateral sclerosis",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "c5f5e9ed8295",
+   "disease_id": "NEURO-BP-012",
+   "name": "Bell's palsy",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "218020aaafce",
+   "disease_id": "NEURO-EPI-001",
+   "name": "Epilepsy (focal and generalized)",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "acdb094abc82",
+   "disease_id": "NEURO-EPI-001",
+   "name": "Epilepsy (focal and generalized)",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "27f88c1d26fc",
+   "disease_id": "NEURO-ET-014",
+   "name": "Essential tremor",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "dd546d47d53e",
+   "disease_id": "NEURO-ET-014",
+   "name": "Essential tremor",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "c98b3947de11",
+   "disease_id": "NEURO-GBS-010",
+   "name": "Guillain-Barre syndrome",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "06b39d3ceebc",
+   "disease_id": "NEURO-GBS-010",
+   "name": "Guillain-Barre syndrome",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "8337b31fcb34",
+   "disease_id": "NEURO-HD-008",
+   "name": "Huntington's disease",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "46db8640e705",
+   "disease_id": "NEURO-HD-008",
+   "name": "Huntington's disease",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "04eb41e1f21d",
+   "disease_id": "NEURO-MEN-015",
+   "name": "Meningitis",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "596a5f7c549c",
+   "disease_id": "NEURO-MG-009",
+   "name": "Myasthenia gravis",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "852b384b9970",
+   "disease_id": "NEURO-MG-009",
+   "name": "Myasthenia gravis",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "843e732d5002",
+   "disease_id": "NEURO-MIG-011",
+   "name": "Migraine",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "298c045e908b",
+   "disease_id": "NEURO-MS-006",
+   "name": "Multiple sclerosis",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "bf34e2847fee",
+   "disease_id": "NEURO-MS-006",
+   "name": "Multiple sclerosis",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "e2f637bb16e2",
+   "disease_id": "NEURO-PD-002",
+   "name": "Parkinson's disease",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "5bc637e9d63f",
+   "disease_id": "NEURO-PD-002",
+   "name": "Parkinson's disease",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "878f6d2781f0",
+   "disease_id": "NEURO-PN-005",
+   "name": "Peripheral neuropathy (diabetic and idiopathic)",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "adf6f4a4a38c",
+   "disease_id": "NEURO-PN-005",
+   "name": "Peripheral neuropathy (diabetic and idiopathic)",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "a953565d77e6",
+   "disease_id": "NEURO-STR-004",
+   "name": "Ischemic stroke",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "dc32ca092a70",
+   "disease_id": "NEURO-TIA-013",
+   "name": "Transient ischemic attack",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  },
+  {
+   "id": "1a78e53b9d08",
+   "disease_id": "NEURO-TN-016",
+   "name": "Trigeminal neuralgia",
+   "url": null,
+   "kind": "identifier_pending_verification",
+   "priority": "info",
+   "detail": "orpha_code is PENDING_VERIFICATION.",
+   "status": "open"
+  },
+  {
+   "id": "a0673f8e24e4",
+   "disease_id": "NEURO-TN-016",
+   "name": "Trigeminal neuralgia",
+   "url": null,
+   "kind": "no_claim_level_traceability",
+   "priority": "info",
+   "detail": "Definition/symptoms/red flags are not linked to specific passages of the cited sources; a reviewer must confirm each claim against the source.",
+   "status": "open"
+  }
+ ],
+ "note": "liveness != claim support; unreachable/blocked are unverifiable, not dead."
+}

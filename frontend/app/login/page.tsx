@@ -1,33 +1,42 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyMessage } from "../../lib/errors";
 import { useRouter } from "next/navigation";
 import { api, setSession } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("clinician@neuromas.demo");
-  const [password, setPassword] = useState("demo12345");
-  const [fullName, setFullName] = useState("Dr. Demo Clinician");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("clinician");
   const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
       if (mode === "register") {
-        await api.register(email, password, fullName, role, inviteCode);
+        const created = await api.register(email, password, fullName, role, inviteCode);
+        if (created && created.status === "confirmation_required") {
+          // Email verification is enforced: no session exists until the address is confirmed.
+          setNotice("Account created. Check your email and confirm your address, then sign in.");
+          setMode("login");
+          return;
+        }
       }
       const data = await api.login(email, password);
       setSession(data.access_token, data.role);
       router.push("/");
     } catch (err: any) {
-      setError(err.message || "Something went wrong");
+      setError(friendlyMessage(String(err?.message ?? "")));
     } finally {
       setLoading(false);
     }
@@ -48,25 +57,26 @@ export default function LoginPage() {
           {mode === "register" && (
             <>
               <input className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
-                placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                placeholder="Full name" aria-label="Full name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
               <select className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
-                value={role} onChange={(e) => setRole(e.target.value)}>
+                aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="clinician">Clinician</option>
                 <option value="patient">Patient</option>
                 <option value="caregiver">Caregiver</option>
               </select>
               {role === "clinician" && (
                 <input className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
-                  placeholder="Clinician invite code (required on deployed servers)" value={inviteCode}
+                  placeholder="Clinician invite code (required on deployed servers)" aria-label="Clinician invite code" value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)} />
               )}
             </>
           )}
           <input className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
-            placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            placeholder="Email" aria-label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <input className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
-            placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          {error && <div className="text-neuro-critical text-xs">{error}</div>}
+            placeholder="Password" aria-label="Password" type="password" required minLength={mode === "register" ? 8 : undefined} autoComplete={mode === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+          {error && <div role="alert" className="text-neuro-critical text-xs">{error}</div>}
+          {notice && <div role="status" className="text-neuro-accent text-xs">{notice}</div>}
           <button disabled={loading} className="w-full bg-neuro-accent text-neuro-bg font-medium rounded-lg py-2 text-sm disabled:opacity-50">
             {loading ? "Please wait..." : mode === "login" ? "Sign in" : "Register & sign in"}
           </button>

@@ -13,3 +13,6 @@ backend/login_body.json
 .coverage
 backend/ml/data/cache/
 .hypothesis/
+.pytest_cache/
+.ruff_cache/
+backend/ml/simulation/__pycache__/

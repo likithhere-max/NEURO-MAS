@@ -6,6 +6,7 @@ from source code.
 """
 from __future__ import annotations
 from functools import lru_cache
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -53,6 +54,28 @@ class Settings(BaseSettings):
     # scripts/migration_phase2_persistence.sql). False = sequential inserts with an explicit persist_state marker.
     # Only turn on after the migration has been applied to the target project.
     persist_via_rpc: bool = False
+    # Optional owner-supplied interaction-database snapshot (see app/services/ddi.py SnapshotSource). Empty = only the
+    # illustrative curated table is used and the medication agent reports interactions as incompletely assessed.
+    ddi_snapshot_path: str = ""
+    # --- External (LLM) processing policy: see app/core/privacy.py ---
+    # disabled   : nothing leaves the system; every narrative uses the deterministic template
+    # redacted   : (default) best-effort masking of identifiers before sending
+    # unredacted : send as-is (only for synthetic data / explicit owner decision)
+    external_processing_mode: str = "redacted"
+    # A patient-scoped external call needs patients.external_ai_consent = true (default false => fail closed).
+    require_patient_consent: bool = True
+    # --- Notifications (app/services/notification_dispatch.py) ---
+    # "none" (default): nothing is ever sent and actions stay 'proposed'. "smtp": real e-mail via the settings below.
+    notification_channel: str = "none"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    notification_max_attempts: int = 3
+    notification_attempt_timeout_s: float = 10.0
+    notification_backoff_base_s: float = 1.0
     # Max agents executing at the same time (bounds LLM/CPU fan-out).
     max_agent_concurrency: int = 4
     # Hard limits on patient-supplied free text (abuse / cost / prompt-injection surface).
@@ -63,6 +86,9 @@ class Settings(BaseSettings):
     # the internet. If CLINICIAN_INVITE_CODE is set, clinician signup requires it. If it is NOT
     # set, clinician self-signup is allowed only when ENVIRONMENT=development (local demos).
     clinician_invite_code: str = ""
+    # Demo/dev convenience ONLY: create accounts pre-confirmed (no email verification). Refused at startup unless
+    # ENVIRONMENT=development. Default False: signup goes through Supabase's email-confirmation flow.
+    auto_confirm_email: bool = False
     auth_rate_limit_per_minute: int = 10
     # --- CORS ---
     # "*" added 2026-09-02 as a same-day-review convenience: the frontend is
@@ -73,6 +99,16 @@ class Settings(BaseSettings):
     # in practice. Replace "*" with the real Netlify URL once it's stable and
     # remove this note.
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "*"]
+    @model_validator(mode="after")
+    def _refuse_unsafe_combinations(self):
+        if self.auto_confirm_email and self.environment.lower() != "development":
+            raise ValueError("AUTO_CONFIRM_EMAIL=true is only allowed when ENVIRONMENT=development "
+                             "(it disables email verification)")
+        if self.notification_channel.lower() == "smtp" and not (self.smtp_host and self.smtp_from):
+            raise ValueError("NOTIFICATION_CHANNEL=smtp requires SMTP_HOST and SMTP_FROM")
+        return self
+
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()

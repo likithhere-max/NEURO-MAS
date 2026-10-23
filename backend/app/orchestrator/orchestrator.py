@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 from app.agents.registry import AGENT_DEPENDENCIES, ancestors, get_agent, all_agents
+from app.core import privacy
 from app.core.actions import ProposedAction, build_action
 from app.core.config import get_settings
 from app.core.consensus import ConsensusOutcome, compute_evidence_consensus
@@ -171,7 +172,7 @@ async def _run_agents(state: WorkflowState, per_agent_timeout: float, deadline_s
     state.agent_results = {n: state.agent_results[n] for n in AGENT_DEPENDENCIES if n in state.agent_results}
 
 
-async def run_workflow(
+async def _run_workflow(
     *,
     patient_id: str,
     trigger_reason: str,
@@ -323,3 +324,35 @@ async def run_workflow(
                                       "timed_out_agents": state.timed_out_agents,
                                       "deadline_exceeded": state.deadline_exceeded})
     return state
+
+
+def _external_summary(events: list[dict]) -> dict[str, Any]:
+    red: dict[str, int] = {}
+    reasons: dict[str, int] = {}
+    for e in events:
+        for k, v in e.get("redactions", {}).items():
+            red[k] = red.get(k, 0) + v
+        if not e["allowed"]:
+            reasons[e["reason"]] = reasons.get(e["reason"], 0) + 1
+    return {"calls_attempted": len(events), "calls_allowed": sum(1 for e in events if e["allowed"]),
+            "calls_blocked": sum(1 for e in events if not e["allowed"]), "blocked_reasons": reasons,
+            "redactions": red, "mode": privacy.decide("generate").mode}
+
+
+async def run_workflow(
+    *,
+    patient_id: str,
+    trigger_reason: str,
+    input_payload: dict[str, Any],
+    patient_state: PatientState,
+    workflow_id: str | None = None,
+    on_checkpoint: Callable[[WorkflowState, str], Awaitable[None]] | None = None,
+) -> WorkflowState:
+    """Runs the workflow inside a privacy scope derived from the patient's recorded consent; every external model
+    call made by any agent is authorised/redacted by app/core/privacy.py and summarised (counts only) in the audit trail."""
+    with privacy.processing_scope(purpose="workflow", consent=patient_state.external_ai_consent,
+                                  identifiers=patient_state.redaction_identifiers) as pctx:
+        state = await _run_workflow(patient_id=patient_id, trigger_reason=trigger_reason, input_payload=input_payload,
+                                    patient_state=patient_state, workflow_id=workflow_id, on_checkpoint=on_checkpoint)
+        _log(state, "external_processing_summary", _external_summary(pctx.events))
+        return state

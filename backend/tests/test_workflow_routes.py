@@ -219,3 +219,55 @@ def test_response_exposes_typed_consensus_labels_and_run_health(setup):
     if body["consensus"]:
         c = body["consensus"]
         assert c["calibrated"] is False and c["probability"] is None and c["score_kind"] == "uncalibrated_support_index"
+
+
+# ---------------- Phase 2: notification dispatch wired after persistence (MOCK provider) ----------------
+from app.services import notification_dispatch as nd, notification_service as ns  # noqa: E402
+from tests.helpers_notifications import MockProvider  # noqa: E402
+
+
+def _install_dispatcher(monkeypatch, provider, db):
+    store = nd.InMemoryNotificationStore()
+    events = []
+
+    def build(admin, escalate=None, audit=None):
+        async def sleep(d): pass
+        return nd.NotificationDispatcher(provider, store, audit=events.append, escalate=escalate, max_attempts=2,
+                                         attempt_timeout=1.0, backoff_base=0.0, sleep=sleep)
+    monkeypatch.setattr(ns, "build_dispatcher", build)
+    monkeypatch.setattr(wf_routes, "get_supabase_admin_client", lambda: object(), raising=False)
+    import app.core.supabase_client as sc
+    monkeypatch.setattr(sc, "get_supabase_admin_client", lambda: object())
+    monkeypatch.setattr(ns, "get_settings", lambda: type("S", (), {"notification_channel": "mock"})())
+    return store, events
+
+
+def test_emergency_action_is_dispatched_once_and_status_reflects_the_provider(setup, monkeypatch):
+    db, _ = setup
+    db["patients"][0] = {**db["patients"][0], "clinician_id": "doc"}
+    p = MockProvider([("sent", "")])
+    store, _ev = _install_dispatcher(monkeypatch, p, db)
+    body = _post_key("I can't breathe").json()
+    esc = [a for a in body["proposed_actions"] if a["action_type"] == "emergency_escalation"][0]
+    assert esc["status"] == "sent_unconfirmed"               # accepted by provider, delivery NOT confirmed
+    assert len(p.calls) == 1
+    assert [a["status"] for a in db["actions"] if a["action_type"] == "emergency_escalation"] == ["sent_unconfirmed"]
+    again = _post_key("I can't breathe").json()                # idempotent replay: nothing more is sent
+    assert again["idempotent_replay"] is True and len(p.calls) == 1
+
+
+def test_failed_delivery_raises_a_critical_alert_and_does_not_claim_execution(setup, monkeypatch):
+    db, _ = setup
+    p = MockProvider([("transient_error", "")])
+    _install_dispatcher(monkeypatch, p, db)
+    body = _post_key("I can't breathe").json()
+    esc = [a for a in body["proposed_actions"] if a["action_type"] == "emergency_escalation"][0]
+    assert esc["status"] == "delivery_failed" and body["is_emergency"] is True
+    assert any(str(a["reason"]).startswith("NOTIFICATION DELIVERY FAILED") and a["severity"] == "critical" for a in db["alerts"])
+
+
+def test_no_channel_configured_sends_nothing_and_keeps_actions_proposed(setup):
+    db, _ = setup
+    body = _post_key("I can't breathe").json()
+    esc = [a for a in body["proposed_actions"] if a["action_type"] == "emergency_escalation"][0]
+    assert esc["status"] == "proposed"

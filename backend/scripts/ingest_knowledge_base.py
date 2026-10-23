@@ -10,6 +10,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.ai.gemini_service import embed_text
+from app.core import privacy
+
+privacy._ctx.set(privacy.ProcessingContext(purpose="kb_ingestion", system=True))  # curated KB text, no patient data
 from app.core.supabase_client import get_supabase_admin_client
 from app.services.knowledge_base import get_knowledge_base
 

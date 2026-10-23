@@ -7,11 +7,13 @@ import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 
+from app.core import privacy
 from app.core.supabase_client import get_authed_client
 from app.orchestrator.orchestrator import run_workflow
 from app.schemas.api import WorkflowTriggerIn
 from app.schemas.symptom_assessment import SymptomAssessmentIn
 from app.services.auth import get_current_user
+from app.services import notification_service
 from app.services.repository import (
     build_patient_state,
     consensus_to_dict,
@@ -48,6 +50,22 @@ def _stored_complete_workflow(client, workflow_id: str | None):
     if rows and (rows[0].get("result_json") or {}).get("persist_state", "complete") == "complete":
         return rows[0]
     return None
+
+
+async def _deliver_notifications(client, workflow_state, patient: dict) -> None:
+    """After the workflow is stored, hand permitted actions to the configured channel (if any). A failure here is
+    logged and escalated by the dispatcher; it never changes the already-stored assessment or the HTTP result."""
+    try:
+        from app.core.supabase_client import get_supabase_admin_client
+        admin = get_supabase_admin_client()
+        dispatcher = notification_service.build_dispatcher(
+            admin, escalate=notification_service.make_alert_escalation(client),
+            audit=lambda e: logger.info("notification_audit %s", e))
+        if dispatcher is None:
+            return
+        await notification_service.dispatch_workflow_notifications(workflow_state, patient, dispatcher, client)
+    except Exception as exc:
+        logger.error("notification_stage_failed error_class=%s", type(exc).__name__)
 
 
 def _emergency_checkpoint(client):
@@ -139,6 +157,7 @@ async def trigger_neurological_assessment(
     if observation_rows:
         client.table("observations").insert(observation_rows).execute()
 
+    await _deliver_notifications(client, workflow_state, patient)
     return _serialize_workflow(workflow_state)
 
 
@@ -176,10 +195,16 @@ async def trigger_symptom_assessment(
                 "extracted": stored[0]["extracted_json"] if stored else None,
                 "workflow": _load_workflow(client, workflow_id)}
 
-    try:
-        extracted = await extract_symptom_profile(payload)
-    except SymptomExtractionError as exc:
-        raise HTTPException(502, str(exc))
+    with privacy.processing_scope(purpose="symptom_extraction", consent=bool(patient.get("external_ai_consent", False)),
+                                  identifiers=[patient.get("full_name")]):
+        gate = privacy.decide("generate")
+        if not gate.allowed:
+            # Extraction has no local fallback, so say why instead of returning a misleading 502.
+            raise HTTPException(403, f"external AI processing is not permitted for this patient ({gate.reason})")
+        try:
+            extracted = await extract_symptom_profile(payload)
+        except SymptomExtractionError as exc:
+            raise HTTPException(502, str(exc))
 
     symptom_ins = extracted_profile_to_symptom_ins(payload.free_text, extracted)
 
@@ -228,6 +253,7 @@ async def trigger_symptom_assessment(
     assessment_result = client.table("symptom_assessments").insert(assessment_row).execute()
     assessment = assessment_result.data[0] if assessment_result.data else None
 
+    await _deliver_notifications(client, workflow_state, patient)
     return {
         "assessment": assessment,
         "extracted": extracted.model_dump(),

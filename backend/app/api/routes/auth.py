@@ -3,7 +3,7 @@ from __future__ import annotations
 import hmac
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from app.core.config import get_settings
@@ -32,21 +32,63 @@ def _check_clinician_signup_allowed(payload: UserCreate) -> None:
         raise HTTPException(403, "clinician self-registration is disabled")
 
 
-@router.post("/signup", response_model=Token, dependencies=[Depends(rate_limit_auth)])
-def signup(payload: UserCreate):
+@router.post("/signup", dependencies=[Depends(rate_limit_auth)])
+def signup(payload: UserCreate, response: Response):
+    """
+    Create an account.
+
+    * AUTO_CONFIRM_EMAIL=true (development only; refused at startup elsewhere): the account is created pre-confirmed
+      and a session token is returned immediately, as before.
+    * Otherwise: the normal Supabase sign-up flow runs, which emails a confirmation link. The profile row is written
+      with the service-role client (the unconfirmed user cannot sign in yet) and the response is 202
+      `{"status": "confirmation_required"}` -- no token is issued until the address is confirmed.
+      If the Supabase PROJECT itself has "Confirm email" switched off, sign-up returns a session; that is a project
+      setting the code cannot see, so it is logged loudly and reported as `email_verification: "not_enforced_by_project"`.
+    """
     if payload.role not in {"clinician", "patient", "caregiver"}:
         raise HTTPException(400, "role must be one of clinician, patient, caregiver")
     if payload.role == "clinician":
         _check_clinician_signup_allowed(payload)
 
+    settings = get_settings()
     admin = get_supabase_admin_client()
     public = new_public_client()  # per-request: sign-in state must not be shared across requests
 
+    if settings.auto_confirm_email and settings.environment.lower() == "development":
+        return _signup_preconfirmed(payload, admin, public)
+
+    try:
+        created = public.auth.sign_up({"email": payload.email, "password": payload.password})
+        user_id = created.user.id
+    except Exception as exc:
+        logger.warning("signup_failed error=%r", exc)
+        raise HTTPException(400, "could not create account (the email may already be registered)")
+
+    try:
+        admin.table("profiles").insert({"id": user_id, "full_name": payload.full_name, "role": payload.role}).execute()
+    except Exception as exc:
+        logger.error("signup_profile_step_failed user_id=%s error=%r", user_id, exc)
+        try:
+            admin.auth.admin.delete_user(user_id)
+        except Exception as cleanup_exc:  # pragma: no cover
+            logger.error("signup_cleanup_failed user_id=%s error=%r", user_id, cleanup_exc)
+        raise HTTPException(500, "account setup failed; please try again")
+
+    if getattr(created, "session", None) is not None:
+        logger.error("signup_email_verification_not_enforced_by_supabase_project user_id=%s", user_id)
+        return {"status": "created", "email_verification": "not_enforced_by_project",
+                "access_token": created.session.access_token, "token_type": "bearer", "role": payload.role}
+    response.status_code = 202
+    return {"status": "confirmation_required", "email_verification": "pending",
+            "message": "Check your email and confirm your address, then sign in."}
+
+
+def _signup_preconfirmed(payload: UserCreate, admin, public):
     try:
         created = admin.auth.admin.create_user({
             "email": payload.email,
             "password": payload.password,
-            "email_confirm": True,  # KNOWN GAP: no email verification (needs SMTP configured in Supabase)
+            "email_confirm": True,  # development only (AUTO_CONFIRM_EMAIL); impossible to enable elsewhere
         })
     except Exception as exc:
         logger.warning("signup_create_user_failed error=%r", exc)

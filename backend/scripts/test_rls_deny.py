@@ -3,6 +3,9 @@ Step 7 test script -- creates a SECOND test user and confirms they cannot
 read or modify the first test user's profile row. This is the deny-side
 proof that Step 6's allow-side proof was missing.
 """
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+import _testcfg  # live-script guard + env-provided password
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -12,7 +15,7 @@ from app.core.supabase_client import get_supabase_admin_client, get_supabase_pub
 USER_1_ID = "7cea8de3-e08b-4b07-8b21-690e82b392a8"  # from Step 6's output
 
 TEST_EMAIL_2 = "neuromas.test.user2@example.com"
-TEST_PASSWORD_2 = "TestPassword123!"
+TEST_PASSWORD_2 = _testcfg.test_password()
 
 admin = get_supabase_admin_client()
 public = get_supabase_public_client()

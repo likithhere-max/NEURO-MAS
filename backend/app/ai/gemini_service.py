@@ -18,6 +18,7 @@ from google.genai import types
 from pydantic import BaseModel
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from app.core import privacy
 from app.core.config import get_settings
 
 logger = logging.getLogger("neuromas.gemini")
@@ -64,6 +65,11 @@ class GeminiServiceError(Exception):
     data when the real call fails."""
 
 
+class ExternalProcessingBlockedError(GeminiServiceError):
+    """Policy/consent refused the call BEFORE anything was sent. Subclasses GeminiServiceError so every existing
+    caller falls back to its deterministic template exactly as for an outage."""
+
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=8),
@@ -90,6 +96,12 @@ def generate_structured(
     """
     settings = get_settings()
     chosen_model = model or settings.gemini_default_model
+
+    decision, (prompt, system_instruction) = privacy.authorize_external_call(
+        "generate", [prompt, system_instruction], model=chosen_model)
+    if not decision.allowed:
+        logger.info("gemini_call_blocked reason=%s", decision.reason)
+        raise ExternalProcessingBlockedError(f"external processing blocked: {decision.reason}")
 
     config: dict = {
         "response_mime_type": "application/json",
@@ -155,6 +167,10 @@ def embed_text(text: str, *, task_hint: str | None = None) -> list[float]:
     matters for retrieval quality.
     """
     settings = get_settings()
+    decision, (text,) = privacy.authorize_external_call("embed", [text], model=settings.gemini_embedding_model)
+    if not decision.allowed:
+        logger.info("gemini_embed_blocked reason=%s", decision.reason)
+        raise ExternalProcessingBlockedError(f"external processing blocked: {decision.reason}")
     content = f"task: {task_hint} | query: {text}" if task_hint else text
 
     started = time.monotonic()

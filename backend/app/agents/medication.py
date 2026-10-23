@@ -25,6 +25,7 @@ from app.schemas.patient_state import PatientState
 import math
 
 from app.services.clinical_rules import check_allergy_conflicts, check_interactions, unassessed_medications
+from app.services.ddi import get_default_checker
 
 
 class _MedicationSafetyNarrative(BaseModel):
@@ -137,6 +138,19 @@ class MedicationSafetyAgent(BaseNeuroAgent):
                 severity="info",
             ))
 
+        # Source-aware pairwise check with distinct statuses (app/services/ddi.py). It ADDS the per-pair status and
+        # the incomplete-data warning; the legacy lists above stay for compatibility.
+        ddi = get_default_checker().check(active_meds)
+        incomplete_pairs = [p for p in ddi.pairs if p.status.value not in ("known_interaction", "no_interaction_found_in_source")]
+        if incomplete_pairs and not unassessed:
+            findings.append(AgentFinding(
+                label="interaction_check_incomplete",
+                detail=f"{len(incomplete_pairs)} of {len(ddi.pairs)} medication pair(s) could not be fully assessed by the "
+                       f"available interaction source(s) {ddi.status_counts()}; no finding does NOT mean the combination is safe.",
+                severity="info",
+            ))
+        warnings_extra.extend(w for w in ddi.warnings if w.startswith("ddi_"))
+
         template_summary = (
             f"Checked {len(active_meds)} active medication(s) against a curated interaction/"
             f"allergy table. Found {len(interactions)} interaction(s), {len(allergy_hits)} "
@@ -155,10 +169,13 @@ class MedicationSafetyAgent(BaseNeuroAgent):
             narrative_source = "template_fallback"
             warnings.append("gemini_narrative_unavailable_used_template_summary")
 
+        no_data = not active_meds and not findings
+        if no_data:
+            warnings.append("no_active_medication_list_on_record: unknown, not 'none'")
         return AgentResult(
             agent_name=self.name,
             task_id=task.task_id,
-            status=AgentStatus.COMPLETED,
+            status=AgentStatus.INSUFFICIENT_DATA if no_data else AgentStatus.COMPLETED,
             findings=findings,
             confidence=confidence,
             warnings=warnings,
@@ -168,6 +185,7 @@ class MedicationSafetyAgent(BaseNeuroAgent):
             raw_payload={
                 "interactions": interactions,
                 "unassessed_medications": unassessed,
+                "ddi_report": ddi.as_dict(),
                 "rule_table_size": 5,
                 "allergy_conflicts": allergy_hits,
                 "adherence_pct_30d": adherence,

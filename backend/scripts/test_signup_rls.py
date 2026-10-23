@@ -8,6 +8,9 @@ Safe-ish to re-run, but Supabase will reject creating the same email twice.
 If you need to re-run this, delete the test user first in the Supabase
 dashboard: Authentication -> Users.
 """
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+import _testcfg  # live-script guard + env-provided password
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -15,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.supabase_client import get_supabase_admin_client, get_supabase_public_client
 
 TEST_EMAIL = "neuromas.test.user@example.com"
-TEST_PASSWORD = "TestPassword123!"
+TEST_PASSWORD = _testcfg.test_password()
 
 admin = get_supabase_admin_client()
 public = get_supabase_public_client()

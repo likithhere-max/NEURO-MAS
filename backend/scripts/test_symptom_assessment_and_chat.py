@@ -16,6 +16,9 @@ same canned result regardless of input.
 Run with the server already running in another window:
     python scripts\\test_symptom_assessment_and_chat.py
 """
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+import _testcfg  # live-script guard + env-provided password
 import requests
 
 BASE = "http://127.0.0.1:8000/api/v1"
@@ -32,7 +35,7 @@ def check(label, resp):
 # 1. Login (reuses the existing test user).
 login = check("login", requests.post(f"{BASE}/auth/login", json={
     "email": "apitest@example.com",
-    "password": "TestPassword123!",
+    "password": _testcfg.test_password(),
 }))
 token = login.json()["access_token"]
 headers = {"Authorization": f"Bearer {token}"}

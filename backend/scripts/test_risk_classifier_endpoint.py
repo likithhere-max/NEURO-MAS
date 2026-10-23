@@ -42,6 +42,9 @@ What this script DOES prove:
 Run with the server already running in another window, from backend/:
     python scripts\\test_risk_classifier_endpoint.py
 """
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+import _testcfg  # live-script guard + env-provided password
 import sys
 
 import pandas as pd
@@ -81,7 +84,7 @@ def expect_true(label, condition, detail=""):
 # ---------------------------------------------------------------------------
 login = check("login", requests.post(f"{BASE}/auth/login", json={
     "email": "apitest@example.com",
-    "password": "TestPassword123!",
+    "password": _testcfg.test_password(),
 }))
 if login.status_code != 200:
     sys.exit("Cannot continue without a token. Is the server running, and does the test user still exist?")

@@ -122,6 +122,11 @@ class PatientState(BaseModel):
     current_alerts: list[str] = Field(default_factory=list)
     active_workflows: list[str] = Field(default_factory=list)
 
+    # Privacy controls (app/core/privacy.py). Consent defaults to FALSE: no recorded consent => no external LLM call.
+    external_ai_consent: bool = False
+    # Identifiers (e.g. the patient's name) masked from anything sent to an external model; never serialised.
+    redaction_identifiers: list[str] = Field(default_factory=list, exclude=True)
+
     data_completeness: float = Field(
         default=0.0, ge=0.0, le=1.0,
         description="Fraction of expected state fields with real (non-null) data. "
