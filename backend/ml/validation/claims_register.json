@@ -1,0 +1,301 @@
+{
+ "register_schema": "neuro-mas-claims-register/1",
+ "classes": [
+  "VERIFIED_INTERNAL_EVIDENCE",
+  "VERIFIED_EXTERNAL_EVIDENCE",
+  "EXPLORATORY",
+  "SYNTHETIC_ENGINEERING_TEST",
+  "PLANNING_ESTIMATE",
+  "NOT_RUN",
+  "BLOCKED",
+  "FAILED",
+  "METADATA_CONSISTENCY_ONLY"
+ ],
+ "rule": "A claim cannot be classed higher than its evidence. No claim is VERIFIED_* because no authenticated real-data result and no external cohort exist.",
+ "claims": [
+  {
+   "id": "CL01",
+   "claim": "The historical disease figures (LOSO accuracy 0.7744, AUC 0.7941) are reproduced from the public data.",
+   "class": "NOT_RUN",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P4A-DISEASE"
+    },
+    {
+     "type": "file",
+     "ref": "docs/phase6/BASELINE_REPORT.md"
+    }
+   ],
+   "status_note": "Not reproduced: the data file is unavailable (HTTP 403). The figures stay HISTORICAL_UNVERIFIED_NOT_REPRODUCED."
+  },
+  {
+   "id": "CL02",
+   "claim": "The historical risk figures (accuracy 0.6304, AUC 0.6405) are reproduced from the public data.",
+   "class": "NOT_RUN",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P4A-RISK"
+    },
+    {
+     "type": "file",
+     "ref": "docs/phase6/BASELINE_REPORT.md"
+    }
+   ],
+   "status_note": "Not reproduced: the data file is unavailable."
+  },
+  {
+   "id": "CL03",
+   "claim": "The shipped artifacts' recorded counts and metrics are internally consistent (integer confusion matrices, class counts equal scaler row counts).",
+   "class": "METADATA_CONSISTENCY_ONLY",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P4A-ARTIFACT-AUDIT"
+    }
+   ],
+   "status_note": "Consistency of recorded numbers only; says nothing about whether a leakage-free evaluation produced them."
+  },
+  {
+   "id": "CL04",
+   "claim": "The majority-class baselines are 0.7538 (disease) and 0.6182 (risk), arithmetic on the recorded class counts.",
+   "class": "METADATA_CONSISTENCY_ONLY",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P4A-ARTIFACT-AUDIT"
+    }
+   ],
+   "status_note": "Arithmetic on recorded counts. The briefed alternative figure has no traceable source (see CL05)."
+  },
+  {
+   "id": "CL05",
+   "claim": "The risk majority-class baseline quoted in the Phase 5 and Phase 6 briefs (a figure 0.0004 below the traceable value; stated in docs/phase5/BASELINE_AUDIT.md) is supported by the repository.",
+   "class": "FAILED",
+   "evidence": [
+    {
+     "type": "test",
+     "ref": "tests/phase5/test_p5_documented_numbers.py::test_the_untraceable_0_6178_figure_is_nowhere_in_the_code_or_metadata"
+    }
+   ],
+   "status_note": "Claim not supported: the briefed figure appears nowhere in code or metadata; 0.6182 is the traceable value."
+  },
+  {
+   "id": "CL06",
+   "claim": "Voice features add measurable information beyond time and baseline UPDRS for the risk target.",
+   "class": "NOT_RUN",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P6-BASELINE"
+    },
+    {
+     "type": "experiment",
+     "ref": "E-P6-REPORT"
+    }
+   ],
+   "status_note": "Unknown. Requires the registered run; the result would be INCONCLUSIVE unless the p4a-1 rule is met."
+  },
+  {
+   "id": "CL07",
+   "claim": "A voice gain of about +0.03 AUC is probably not resolvable with 42 patients; about +0.09 probably is (single-reference simulation, 12 repetitions per cell).",
+   "class": "PLANNING_ESTIMATE",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P6-VOICE-SAMPLE-SIZE"
+    }
+   ],
+   "status_note": "Optimistic planning figure with large Monte-Carlo error; not a result about the real data."
+  },
+  {
+   "id": "CL08",
+   "claim": "With 24 PD and 8 healthy subjects the minimum detectable disease AUC at 80% power is about 0.835.",
+   "class": "PLANNING_ESTIMATE",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P5-POWER"
+    }
+   ],
+   "status_note": "Analytic design-stage arithmetic."
+  },
+  {
+   "id": "CL09",
+   "claim": "An external validation with half-width 0.05 on sensitivity and specificity needs about 784 subjects at 25% prevalence (assumed sensitivity 0.85, specificity 0.80).",
+   "class": "PLANNING_ESTIMATE",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "docs/phase6/CLINICAL_VALIDATION_PROTOCOL.md"
+    },
+    {
+     "type": "test",
+     "ref": "tests/phase6/test_p6_sample_size.py::test_published_planning_table_values"
+    }
+   ],
+   "status_note": "Arithmetic with placeholder assumptions."
+  },
+  {
+   "id": "CL10",
+   "claim": "Either model has been validated on an independent external cohort.",
+   "class": "BLOCKED",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "docs/phase6/CLINICAL_VALIDATION_PROTOCOL.md"
+    }
+   ],
+   "status_note": "No cohort available; protocol drafted; blocked on data access and clinical decisions."
+  },
+  {
+   "id": "CL11",
+   "claim": "Either model is calibrated.",
+   "class": "NOT_RUN",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P6-REPORT"
+    }
+   ],
+   "status_note": "Calibration metrics are implemented but unmeasured."
+  },
+  {
+   "id": "CL12",
+   "claim": "Any prespecified extension candidate improves on the registered baselines.",
+   "class": "NOT_RUN",
+   "evidence": [
+    {
+     "type": "experiment",
+     "ref": "E-P6-EXTENSION"
+    }
+   ],
+   "status_note": "Extension never run; any future result is EXPLORATORY by protocol p6-1."
+  },
+  {
+   "id": "CL13",
+   "claim": "Either model has clinical utility or may be used in patient care.",
+   "class": "BLOCKED",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "docs/phase6/CLINICAL_INTENDED_USE.md"
+    },
+    {
+     "type": "file",
+     "ref": "docs/phase6/CLINICAL_READINESS_GAPS.md"
+    }
+   ],
+   "status_note": "No clinical claim is made. Intended use, endpoints and acceptance criteria need qualified clinical input."
+  },
+  {
+   "id": "CL14",
+   "claim": "Dataset SHA-256 hashes are pinned in the dataset manifest.",
+   "class": "BLOCKED",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "backend/ml/data/DATASET_MANIFEST.json"
+    },
+    {
+     "type": "test",
+     "ref": "tests/phase5/test_p5_data_integrity.py::test_shipped_manifest_is_honestly_unpinned"
+    }
+   ],
+   "status_note": "No file retrieved, so no hash can be honestly recorded."
+  },
+  {
+   "id": "CL15",
+   "claim": "The shipped model artifacts carry COMPLETE training provenance.",
+   "class": "FAILED",
+   "evidence": [
+    {
+     "type": "test",
+     "ref": "tests/phase5/test_p5_artifact_provenance.py::test_shipped_artifacts_are_reported_incomplete_never_complete"
+    }
+   ],
+   "status_note": "They are INCOMPLETE_DECLARED and cannot be backfilled truthfully; retraining on authenticated data would produce COMPLETE records."
+  },
+  {
+   "id": "CL16",
+   "claim": "The registered protocol p4a-1 is unchanged since it was frozen, and p6-1 is additive.",
+   "class": "SYNTHETIC_ENGINEERING_TEST",
+   "evidence": [
+    {
+     "type": "test",
+     "ref": "tests/phase5/test_p5_protocol_immutability.py::test_protocol_hash_is_pinned_to_the_value_registered_before_any_result"
+    },
+    {
+     "type": "test",
+     "ref": "tests/phase6/test_p6_candidates_and_protocol.py::test_p4a_protocol_is_untouched_by_phase6"
+    }
+   ],
+   "status_note": "Verified by hash-pinning tests; an engineering fact about the repository, not performance evidence."
+  },
+  {
+   "id": "CL17",
+   "claim": "The Phase 6 report pipeline fails closed (NOT_RUN, no numbers) when predictions or runs are missing, and refuses mismatched folds.",
+   "class": "SYNTHETIC_ENGINEERING_TEST",
+   "evidence": [
+    {
+     "type": "test",
+     "ref": "tests/phase6/test_p6_report_pipeline.py::test_a_run_that_is_not_completed_gives_not_run_and_no_numbers"
+    },
+    {
+     "type": "test",
+     "ref": "tests/phase6/test_p6_report_pipeline.py::test_extension_with_different_folds_is_refused_not_compared"
+    }
+   ],
+   "status_note": "Tested on forged data matched to stand-in artifacts."
+  },
+  {
+   "id": "CL18",
+   "claim": "The metric library agrees with scikit-learn and hand calculations.",
+   "class": "SYNTHETIC_ENGINEERING_TEST",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "backend/tests/phase6/test_p6_clinical_metrics.py"
+    }
+   ],
+   "status_note": "Unit tests; forged inputs."
+  },
+  {
+   "id": "CL19",
+   "claim": "Validation modules no longer install a global warning filter and run results record warning counts.",
+   "class": "SYNTHETIC_ENGINEERING_TEST",
+   "evidence": [
+    {
+     "type": "test",
+     "ref": "tests/phase6/test_p6_warnings.py::test_importing_the_validation_modules_installs_no_global_ignore_filter"
+    }
+   ],
+   "status_note": "Fixes finding F7."
+  },
+  {
+   "id": "CL20",
+   "claim": "The CI workflow runs the tests and the real-data validation on GitHub.",
+   "class": "NOT_RUN",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": ".github/workflows/backend-ci.yml"
+    }
+   ],
+   "status_note": "Workflow written and YAML-parsed locally; never executed on GitHub because the push is not authorised."
+  },
+  {
+   "id": "CL21",
+   "claim": "Phase 6 commits have been pushed to the remote.",
+   "class": "BLOCKED",
+   "evidence": [
+    {
+     "type": "file",
+     "ref": "docs/phase6/FINAL_READINESS_REPORT.md"
+    }
+   ],
+   "status_note": "Push returns 403 and is not authorised; commits exist locally only."
+  }
+ ]
+}

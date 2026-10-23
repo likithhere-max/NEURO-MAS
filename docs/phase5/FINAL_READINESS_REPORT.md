@@ -118,3 +118,7 @@ No document or test in this phase asserts clinical validity, external or prospec
 clinical utility. `test_no_phase5_document_claims_clinical_validity` fails if such a claim is written without negation.
 A reproducible negative result, a model that abstains, and an explicitly blocked validation are all preferred to an unsupported
 success; this phase produced the third.
+
+---
+*Appended in Phase 6 (history above is unchanged).* Status after Phase 6: `docs/phase6/FINAL_READINESS_REPORT.md`. Real-data experiments are still `NOT_RUN`.
+One statement in `REPRODUCIBILITY.md` section 4 is corrected in `docs/phase6/DATA_AUTHENTICATION.md`: the registered workflow refuses an unauthenticated file (exit 3); only `ml.validation.phase4a` runs one, labelled.

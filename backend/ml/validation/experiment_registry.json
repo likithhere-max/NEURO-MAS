@@ -1,0 +1,329 @@
+{
+ "registry_schema": "neuro-mas-experiment-registry/1",
+ "classes": [
+  "VERIFIED_INTERNAL_EVIDENCE",
+  "VERIFIED_EXTERNAL_EVIDENCE",
+  "EXPLORATORY",
+  "SYNTHETIC_ENGINEERING_TEST",
+  "PLANNING_ESTIMATE",
+  "NOT_RUN",
+  "BLOCKED",
+  "FAILED",
+  "METADATA_CONSISTENCY_ONLY"
+ ],
+ "rule": "An experiment's class is derived from its output file. No entry may be VERIFIED_* unless the output carries the REAL_DATA_AUTHENTICATED_AGAINST_SHIPPED_ARTIFACT label and status completed. Failed, blocked, synthetic and NOT_RUN runs stay listed.",
+ "experiments": [
+  {
+   "id": "E-P2-FETCH",
+   "phase": "2",
+   "title": "Download of UCI 174 / 189 through the session proxy",
+   "command": "PYTHONPATH=. python -m ml.validation.validate_models fetch",
+   "status": "failed",
+   "evidence_status_in_file": "NONE",
+   "evidence_class": "BLOCKED",
+   "clinically_validated": false,
+   "protocol_id": null,
+   "protocol_sha256": null,
+   "outputs": [
+    {
+     "path": "ml/validation/results/fetch_FAILED.json",
+     "sha256": "002654c0fa387971e677386217f03385b97d946e0f4c3590a3114a08062f3db1",
+     "bytes": 2452,
+     "git_commit": "3f2c11d"
+    }
+   ],
+   "note": "HTTP 403 from the egress proxy. Retained as the record of the failed access attempt; not retried against policy."
+  },
+  {
+   "id": "E-P2-ARTIFACTS",
+   "phase": "2",
+   "title": "Inspection of the shipped model artifacts (recorded metadata)",
+   "command": "PYTHONPATH=. python -m ml.validation.validate_models artifacts",
+   "status": "completed",
+   "evidence_status_in_file": "REAL_RUN_ON_REPO_FILES",
+   "evidence_class": "METADATA_CONSISTENCY_ONLY",
+   "clinically_validated": false,
+   "protocol_id": null,
+   "protocol_sha256": null,
+   "outputs": [
+    {
+     "path": "ml/validation/results/artifacts.json",
+     "sha256": "5494b9800a34ee18dae3035c5cd698f6b519218de42315f0c34dfe46ee2c87a1",
+     "bytes": 2091,
+     "git_commit": "3f2c11d"
+    }
+   ],
+   "note": "Reads the shipped artifacts; no dataset used."
+  },
+  {
+   "id": "E-P4A-ARTIFACT-AUDIT",
+   "phase": "4A",
+   "title": "No-data audit of shipped artifacts (historical figures vs recorded counts)",
+   "command": "PYTHONPATH=. python -m ml.validation.phase4a artifacts --out ml/validation/results/phase4a",
+   "status": "completed",
+   "evidence_status_in_file": "REAL_ARTIFACTS_NO_DATA_USED",
+   "evidence_class": "METADATA_CONSISTENCY_ONLY",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase4a/artifact_audit.json",
+     "sha256": "8a04d3c0655d9553ccae0edf0120e31497b6f5dba92e76ef3960992955266130",
+     "bytes": 11788,
+     "git_commit": "8e4f4d3"
+    }
+   ],
+   "note": "Historical metrics are internally consistent only; none is reproduced."
+  },
+  {
+   "id": "E-P4A-SELFTEST",
+   "phase": "4A",
+   "title": "Harness integrity self-test on synthetic scenarios",
+   "command": "PYTHONPATH=. python -m ml.validation.phase4a selftest --out ml/validation/results/phase4a",
+   "status": "completed",
+   "evidence_status_in_file": "SYNTHETIC_FIXTURE_NOT_EVIDENCE",
+   "evidence_class": "SYNTHETIC_ENGINEERING_TEST",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": null,
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase4a/selftest_SYNTHETIC_NOT_EVIDENCE.json",
+     "sha256": "2fe8bb1f5cca31011e4e30243aacb5bde98e9695cb00d2cbabe6145952075ec8",
+     "bytes": 17289,
+     "git_commit": "8e4f4d3"
+    }
+   ],
+   "note": "Proves the validation code detects planted leakage; says nothing about the real data or models."
+  },
+  {
+   "id": "E-P4A-DISEASE",
+   "phase": "4A",
+   "title": "Registered p4a-1 disease validation",
+   "command": "PYTHONPATH=. python -m ml.validation.phase4a run --kind disease --csv <parkinsons.data> --out ml/validation/results/phase4a",
+   "status": "not_run",
+   "evidence_status_in_file": "NONE",
+   "evidence_class": "NOT_RUN",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase4a/disease_NOT_RUN.json",
+     "sha256": "1f4ebd703643cf82b7e1853d8dbbc090e2b485434982a588e0c6664c277732c8",
+     "bytes": 2346,
+     "git_commit": "8e4f4d3"
+    }
+   ],
+   "note": "No data file."
+  },
+  {
+   "id": "E-P4A-RISK",
+   "phase": "4A",
+   "title": "Registered p4a-1 risk validation",
+   "command": "PYTHONPATH=. python -m ml.validation.phase4a run --kind risk --csv <parkinsons_updrs.data> --out ml/validation/results/phase4a",
+   "status": "not_run",
+   "evidence_status_in_file": "NONE",
+   "evidence_class": "NOT_RUN",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase4a/risk_NOT_RUN.json",
+     "sha256": "dfa8edcd35d0383a8de3ea8e92a0d38e02281152bf58e66d7b6491feb2d42bef",
+     "bytes": 2373,
+     "git_commit": "8e4f4d3"
+    }
+   ],
+   "note": "No data file."
+  },
+  {
+   "id": "E-P5-POWER",
+   "phase": "5",
+   "title": "Design-stage precision and power planning",
+   "command": "PYTHONPATH=. python -m ml.validation.power_planning --reps 20 --out ml/validation/results/phase5/power_planning.json",
+   "status": "completed",
+   "evidence_status_in_file": "DESIGN_STAGE_PLANNING_NOT_EVIDENCE",
+   "evidence_class": "PLANNING_ESTIMATE",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase5/power_planning.json",
+     "sha256": "5585c060a6d08c6f3d49b0007c533f491076228bf11bf9d6fde43185a9a475bb",
+     "bytes": 6961,
+     "git_commit": "bf53d1b"
+    }
+   ],
+   "note": "Simulated generator with an arbitrary signal unit; not evidence about the real data."
+  },
+  {
+   "id": "E-P5-WORKFLOW",
+   "phase": "5",
+   "title": "Registered workflow, no data",
+   "command": "PYTHONPATH=. python -m ml.validation.workflow run --out ml/validation/results/phase5/workflow_no_data",
+   "status": "not_run",
+   "evidence_status_in_file": null,
+   "evidence_class": "NOT_RUN",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase5/workflow_no_data/experiment_manifest.json",
+     "sha256": "0669ea91325237dc349ccdc8257f703357701eb60059e2779b05cf92cbba2aa3",
+     "bytes": 2521,
+     "git_commit": "33bf7ba"
+    },
+    {
+     "path": "ml/validation/results/phase5/workflow_no_data/disease_NOT_RUN.json",
+     "sha256": "1f4ebd703643cf82b7e1853d8dbbc090e2b485434982a588e0c6664c277732c8",
+     "bytes": 2346,
+     "git_commit": "33bf7ba"
+    },
+    {
+     "path": "ml/validation/results/phase5/workflow_no_data/risk_NOT_RUN.json",
+     "sha256": "dfa8edcd35d0383a8de3ea8e92a0d38e02281152bf58e66d7b6491feb2d42bef",
+     "bytes": 2373,
+     "git_commit": "33bf7ba"
+    },
+    {
+     "path": "ml/validation/results/phase5/workflow_no_data/GENERATED_RESULTS.md",
+     "sha256": "4b290136ae75a3984e66d283f3b9ce07ce17c1e554da20577737cf042d5f1a68",
+     "bytes": 1106,
+     "git_commit": "33bf7ba"
+    },
+    {
+     "path": "ml/validation/results/phase5/workflow_no_data/GENERATED_RESULTS.claims.json",
+     "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+     "bytes": 3,
+     "git_commit": "33bf7ba"
+    }
+   ],
+   "note": "Exit code 2."
+  },
+  {
+   "id": "E-P6-BASELINE",
+   "phase": "6",
+   "title": "Registered workflow p4a-1, no data (Phase 6 re-run)",
+   "command": "PYTHONPATH=. python -m ml.validation.workflow run --out ml/validation/results/phase6/baseline_no_data",
+   "status": "not_run",
+   "evidence_status_in_file": null,
+   "evidence_class": "NOT_RUN",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase6/baseline_no_data/experiment_manifest.json",
+     "sha256": "188e0a2d7e4747ee8d4d815ea0a1362a01d1f8e9e2fcc100369d0a0bc06d3ea9",
+     "bytes": 2549,
+     "git_commit": "50af0e9"
+    },
+    {
+     "path": "ml/validation/results/phase6/baseline_no_data/disease_NOT_RUN.json",
+     "sha256": "1f4ebd703643cf82b7e1853d8dbbc090e2b485434982a588e0c6664c277732c8",
+     "bytes": 2346,
+     "git_commit": "50af0e9"
+    },
+    {
+     "path": "ml/validation/results/phase6/baseline_no_data/risk_NOT_RUN.json",
+     "sha256": "dfa8edcd35d0383a8de3ea8e92a0d38e02281152bf58e66d7b6491feb2d42bef",
+     "bytes": 2373,
+     "git_commit": "50af0e9"
+    },
+    {
+     "path": "ml/validation/results/phase6/baseline_no_data/GENERATED_RESULTS.md",
+     "sha256": "4b290136ae75a3984e66d283f3b9ce07ce17c1e554da20577737cf042d5f1a68",
+     "bytes": 1106,
+     "git_commit": "50af0e9"
+    },
+    {
+     "path": "ml/validation/results/phase6/baseline_no_data/GENERATED_RESULTS.claims.json",
+     "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+     "bytes": 3,
+     "git_commit": "50af0e9"
+    }
+   ],
+   "note": "Exit code 2; manifest records commit 6a9fdf6 and git_dirty false."
+  },
+  {
+   "id": "E-P6-EXTENSION",
+   "phase": "6",
+   "title": "Prespecified extension p6-1-ext, no data",
+   "command": "PYTHONPATH=. python -m ml.validation.workflow run --candidate-set p6-1-ext --out ml/validation/results/phase6/extension_no_data",
+   "status": "not_run",
+   "evidence_status_in_file": null,
+   "evidence_class": "NOT_RUN",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase6/extension_no_data/experiment_manifest.json",
+     "sha256": "d8b1775248f48d6c37644121dd1cb0978d2b198a6accd54d9e7a345b2e746ba9",
+     "bytes": 2827,
+     "git_commit": "50af0e9"
+    },
+    {
+     "path": "ml/validation/results/phase6/extension_no_data/disease_NOT_RUN.json",
+     "sha256": "1f4ebd703643cf82b7e1853d8dbbc090e2b485434982a588e0c6664c277732c8",
+     "bytes": 2346,
+     "git_commit": "50af0e9"
+    },
+    {
+     "path": "ml/validation/results/phase6/extension_no_data/risk_NOT_RUN.json",
+     "sha256": "dfa8edcd35d0383a8de3ea8e92a0d38e02281152bf58e66d7b6491feb2d42bef",
+     "bytes": 2373,
+     "git_commit": "50af0e9"
+    }
+   ],
+   "note": "Exit code 2. Exploratory by protocol even when data exist."
+  },
+  {
+   "id": "E-P6-REPORT",
+   "phase": "6",
+   "title": "Phase 6 report pipeline, no data",
+   "command": "PYTHONPATH=. python -m ml.validation.phase6_report --p4a-dir ml/validation/results/phase6/baseline_no_data --out ml/validation/results/phase6/report_no_data",
+   "status": "not_run",
+   "evidence_status_in_file": null,
+   "evidence_class": "NOT_RUN",
+   "clinically_validated": false,
+   "protocol_id": "p6-1",
+   "protocol_sha256": "7fd315bb10c38478c816c2bd552e8d799e0e36915ce027a50f49ab75b0606ec8",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase6/report_no_data/phase6_NOT_RUN.json",
+     "sha256": "cf47d336763636e24d22a388031b74f797c5eeaba507a8a2d7cf45833b3942d0",
+     "bytes": 1572,
+     "git_commit": "50af0e9"
+    }
+   ],
+   "note": "Exit code 2."
+  },
+  {
+   "id": "E-P6-VOICE-SAMPLE-SIZE",
+   "phase": "6",
+   "title": "Voice-value sample-size simulation",
+   "command": "PYTHONPATH=. python -m ml.validation.power_planning --sample-size --out ml/validation/results/phase6/voice_sample_size_planning.json",
+   "status": "completed",
+   "evidence_status_in_file": "DESIGN_STAGE_PLANNING_NOT_EVIDENCE",
+   "evidence_class": "PLANNING_ESTIMATE",
+   "clinically_validated": false,
+   "protocol_id": "p4a-1",
+   "protocol_sha256": "0b2f10a7ec885419d9a2e72ad80b9d4c60b76987ea71e654edcb157b86723e42",
+   "outputs": [
+    {
+     "path": "ml/validation/results/phase6/voice_sample_size_planning.json",
+     "sha256": "3a5dfd157ad15f52a337096d039980f98f9a7dbdc8097bbf58dd850bb28cf69c",
+     "bytes": 3251,
+     "git_commit": "6a9fdf6"
+    }
+   ],
+   "note": "12 repetitions per cell, single reference, independent-within-patient voice signal: optimistic planning figure."
+  }
+ ]
+}

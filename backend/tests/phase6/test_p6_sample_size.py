@@ -76,3 +76,15 @@ def test_illustrative_tables_are_labelled_planning_not_evidence():
     t = SS.illustrative_tables()
     assert t["label"] == "PLANNING_ARITHMETIC_NOT_EVIDENCE" and len(t["sens_spec"]) == 6 and len(t["auc_precision"]) == 6
     assert norm.ppf(0.975) == pytest.approx(SS.Z, abs=1e-5)
+
+
+def test_published_planning_table_values():
+    """The numbers quoted in docs/phase6/CLINICAL_VALIDATION_PROTOCOL.md are exactly what the module produces."""
+    t = SS.illustrative_tables()
+    got = {(r["prevalence"], r["half_width"]): (r["positives_needed"], r["negatives_needed"], r["total_subjects"]) for r in t["sens_spec"]}
+    assert got[(0.1, 0.1)] == (49, 62, 490) and got[(0.1, 0.05)] == (196, 246, 1960)
+    assert got[(0.25, 0.1)] == (49, 62, 196) and got[(0.25, 0.05)] == (196, 246, 784)
+    assert got[(0.5, 0.1)] == (49, 62, 124) and got[(0.5, 0.05)] == (196, 246, 492)
+    auc = {(r["assumed_auc"], r["prevalence"]): r["total_subjects"] for r in t["auc_precision"]}
+    assert auc[(0.7, 0.25)] == 631 and auc[(0.8, 0.25)] == 494 and auc[(0.9, 0.25)] == 280
+    assert auc[(0.7, 0.5)] == 416 and auc[(0.8, 0.5)] == 302 and auc[(0.9, 0.5)] == 158

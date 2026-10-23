@@ -90,3 +90,7 @@ The no-data artifact audit was re-run in Phase 5 and is identical to the committ
   from a dirty tree is not a clean provenance record. The committed no-data manifest
   (`backend/ml/validation/results/phase5/workflow_no_data/`) was produced at commit `52fbe22` with `git_dirty: false`; it records
   sandbox paths and the sandbox interpreter, which are provenance, not configuration.
+
+---
+*Phase 6 correction (appended; text above kept as history).* In section 4, an unauthenticated file does **not** run through `workflow run`: it is refused with exit code 3. Only the
+exploratory `ml.validation.phase4a` CLI runs one, labelled `UNAUTHENTICATED_USER_FILE_NOT_A_REPRODUCTION_OF_THE_REPORTED_FIGURES`. See `docs/phase6/DATA_AUTHENTICATION.md`.
