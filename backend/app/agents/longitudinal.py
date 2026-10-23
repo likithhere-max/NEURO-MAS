@@ -123,7 +123,7 @@ class LongitudinalAgent(BaseNeuroAgent):
             return AgentResult(
                 agent_name=self.name,
                 task_id=task.task_id,
-                status=AgentStatus.COMPLETED,
+                status=AgentStatus.INSUFFICIENT_DATA,
                 confidence=0.0,
                 warnings=["no_baseline_history_available"],
                 reasoning_summary="No longitudinal history exists yet for this patient; "

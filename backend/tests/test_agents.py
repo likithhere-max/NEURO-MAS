@@ -51,7 +51,7 @@ async def test_signal_agent_returns_model_not_available_for_unsupported_modality
     agent = SignalAnalysisAgent()
     state = PatientState(patient_id="p1")
     result = await agent.execute(_task({"wearable": {"eeg_raw": [1, 2, 3]}}), state)
-    assert result.status == AgentStatus.COMPLETED
+    assert result.status == AgentStatus.ABSTAINED  # Phase 2: nothing was assessed, so it is not COMPLETED
     assert any("MODEL_NOT_AVAILABLE" in w for w in result.warnings)
 
 

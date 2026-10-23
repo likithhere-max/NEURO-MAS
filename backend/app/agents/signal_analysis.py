@@ -166,7 +166,13 @@ class SignalAnalysisAgent(BaseNeuroAgent):
 
         # Not a probability: share of evaluated metrics that had a usable baseline to compare against.
         confidence = round(compared / len(evaluated), 2) if evaluated else 0.0
-        status = AgentStatus.COMPLETED if findings or model_not_available else AgentStatus.SKIPPED
+        # ABSTAINED: data arrived but no supported analysis exists for it (no model) -> nothing was assessed.
+        if findings:
+            status = AgentStatus.COMPLETED
+        elif model_not_available:
+            status = AgentStatus.ABSTAINED
+        else:
+            status = AgentStatus.SKIPPED
 
         template_summary = (
             f"Evaluated {len(evaluated)} supported summary metric(s) ({', '.join(evaluated) or 'none'}); "

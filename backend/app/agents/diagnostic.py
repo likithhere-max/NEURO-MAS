@@ -115,7 +115,7 @@ class NeuroDiagnosticAgent(BaseNeuroAgent):
             return AgentResult(
                 agent_name=self.name,
                 task_id=task.task_id,
-                status=AgentStatus.COMPLETED,
+                status=AgentStatus.INSUFFICIENT_DATA,
                 confidence=0.0,
                 warnings=["no_symptom_data"],
                 requires_human_review=False,
