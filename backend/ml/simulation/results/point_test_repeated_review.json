@@ -1,0 +1,23 @@
+{
+  "seed": 20261023,
+  "reps": 1000,
+  "series_length": 40,
+  "reviews": "n=10..40 (31 reviews)",
+  "noise": "iid N(0,1) (null: no real change)",
+  "python": "3.13.17",
+  "numpy": "2.5.4",
+  "results": {
+    "alpha=0.05": {
+      "single_review_n20_false_alarm": 0.067,
+      "family_wise_false_alarm": 0.796
+    },
+    "alpha=0.01": {
+      "single_review_n20_false_alarm": 0.018,
+      "family_wise_false_alarm": 0.256
+    },
+    "alpha=0.001": {
+      "single_review_n20_false_alarm": 0.001,
+      "family_wise_false_alarm": 0.021
+    }
+  }
+}

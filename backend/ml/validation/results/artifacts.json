@@ -1,0 +1,43 @@
+{
+  "task": "artifacts",
+  "status": "completed",
+  "evidence_status": "REAL_RUN_ON_REPO_FILES",
+  "clinically_validated": false,
+  "seed": 0,
+  "environment": {
+    "python": "3.13.17",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "sklearn": "1.9.1",
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39"
+  },
+  "sklearn_runtime": "1.9.1",
+  "artifacts": {
+    "parkinsons_demo_classifier": {
+      "sha256": "048678799e7bbe4e2d4d4b4113eb01b6c1029fd80460f20b2fab23b59cc1cd04",
+      "manifest_match": true,
+      "feature_count_matches_metadata": true,
+      "load_warnings": [
+        "Trying to unpickle estimator DecisionTreeClassifier from version 1.9.0 when using version 1.9.1. This might lead to brea",
+        "Trying to unpickle estimator Pipeline from version 1.9.0 when using version 1.9.1. This might lead to breaking code or i",
+        "Trying to unpickle estimator RandomForestClassifier from version 1.9.0 when using version 1.9.1. This might lead to brea",
+        "Trying to unpickle estimator SelectKBest from version 1.9.0 when using version 1.9.1. This might lead to breaking code o",
+        "Trying to unpickle estimator StandardScaler from version 1.9.0 when using version 1.9.1. This might lead to breaking cod"
+      ],
+      "metadata_records_sklearn_version": false,
+      "metadata_records_dataset_hash": false
+    },
+    "parkinsons_risk_classifier": {
+      "sha256": "8ab2957fd07284981207147390ac3b92ccb9e8820961a3781d8ba5b1329226a9",
+      "manifest_match": true,
+      "feature_count_matches_metadata": true,
+      "load_warnings": [
+        "Trying to unpickle estimator LogisticRegression from version 1.9.0 when using version 1.9.1. This might lead to breaking",
+        "Trying to unpickle estimator Pipeline from version 1.9.0 when using version 1.9.1. This might lead to breaking code or i",
+        "Trying to unpickle estimator StandardScaler from version 1.9.0 when using version 1.9.1. This might lead to breaking cod"
+      ],
+      "metadata_records_sklearn_version": false,
+      "metadata_records_dataset_hash": false
+    }
+  }
+}
