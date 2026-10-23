@@ -27,10 +27,20 @@ from pydantic import BaseModel
 
 from app.agents.base import BaseNeuroAgent
 from app.ai.gemini_service import GeminiServiceError, generate_structured
+from app.core.metric_semantics import classify_change
 from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
 
 DETERIORATION_THRESHOLD = 0.20  # 20% adverse change vs baseline triggers a flag
+
+
+def _anomaly_direction_adverse(t) -> bool | None:
+    """True/False if the anomaly's direction is known adverse/favourable; None if polarity unknown."""
+    from app.core.metric_semantics import metric_polarity
+    pol = metric_polarity(t.metric)
+    if pol == "unknown" or t.anomaly_z_score is None:
+        return None
+    return (t.anomaly_z_score > 0) == (pol == "higher_worse")
 
 
 class _TrendNarrative(BaseModel):
@@ -101,7 +111,7 @@ class LongitudinalAgent(BaseNeuroAgent):
             )
 
         findings = []
-        deteriorating, improving, stable = [], [], []
+        deteriorating, improving, stable, unclassified = [], [], [], []
         personal_anomalies = []
         trend_summaries = []
         for t in trends:
@@ -109,28 +119,26 @@ class LongitudinalAgent(BaseNeuroAgent):
             delta_pct = None
 
             if t.baseline_value is not None and t.current_value is not None:
-                delta_pct = (t.current_value - t.baseline_value) / (abs(t.baseline_value) or 1)
-                if abs(delta_pct) < 0.05:
-                    stable.append(t.metric)
-                    sev = "info"
-                    classification = "stable"
-                elif delta_pct >= DETERIORATION_THRESHOLD:
-                    deteriorating.append(t.metric)
-                    sev = "high"
-                    classification = "deteriorating"
-                elif delta_pct <= -DETERIORATION_THRESHOLD:
-                    improving.append(t.metric)
-                    sev = "info"
-                    classification = "improving"
-                else:
-                    stable.append(t.metric)
-                    sev = "info"
-                    classification = "stable"
+                ch = classify_change(t.metric, t.baseline_value, t.current_value)
+                classification = ch["classification"]
+                delta_pct = ch["delta_pct"]
+                if classification == "deteriorating":
+                    deteriorating.append(t.metric); sev = "high"
+                elif classification == "improving":
+                    improving.append(t.metric); sev = "info"
+                elif classification == "stable":
+                    stable.append(t.metric); sev = "info"
+                elif classification in ("changed_direction_unknown", "baseline_zero_undefined"):
+                    unclassified.append(t.metric); sev = "medium"
+                else:  # invalid / unknown
+                    unclassified.append(t.metric); sev = "low"
+                pct_txt = f"{round(delta_pct*100,1)}%" if delta_pct is not None else f"abs change {ch['delta_abs']}"
                 findings.append(AgentFinding(
                     label=f"trend:{t.metric}",
-                    detail=f"{t.baseline_value} -> {t.current_value} ({round(delta_pct*100,1)}%) over {t.window}",
+                    detail=f"{t.baseline_value} -> {t.current_value} ({pct_txt}) over {t.window}; "
+                           f"{classification}" + (f" [{ch['note']}]" if ch["note"] else ""),
                     severity=sev,
-                    value=round(delta_pct, 3),
+                    value=round(delta_pct, 3) if delta_pct is not None else None,
                 ))
 
             if t.is_personal_anomaly:
@@ -142,7 +150,7 @@ class LongitudinalAgent(BaseNeuroAgent):
                         f"patient's own history (z-score {t.anomaly_z_score}, based on "
                         f"{t.readings_available} prior reading(s))"
                     ),
-                    severity="high",
+                    severity="high" if _anomaly_direction_adverse(t) is not False else "medium",
                     value=t.anomaly_z_score,
                 ))
 
@@ -159,15 +167,18 @@ class LongitudinalAgent(BaseNeuroAgent):
                     "readings_available": t.readings_available,
                 })
 
-        confidence = 0.7 if findings else 0.0
+        # Not a probability: share of tracked metrics that could be evaluated (coverage).
+        evaluable = sum(1 for t in trends if (t.baseline_value is not None and t.current_value is not None) or t.is_personal_anomaly or t.anomaly_method == 'z_score')
+        confidence = round(evaluable / len(trends), 2) if findings else 0.0
         template_summary = (
             f"Compared {len(trends)} tracked metric(s) to patient baseline. "
             f"Deteriorating: {deteriorating or 'none'}. Improving: {improving or 'none'}. "
             f"Stable: {stable or 'none'}."
+            + (f" Changed but not classifiable (unregistered metric polarity or zero baseline; clinician review needed): {unclassified}." if unclassified else "")
             + (f" Personal statistical anomalies detected in: {personal_anomalies}." if personal_anomalies else "")
         )
 
-        warnings = []
+        warnings = ["confidence_is_metric_coverage_not_probability"]
         if findings:
             narrative = await _explain_trends_with_gemini(trend_summaries)
             if narrative:
@@ -195,6 +206,7 @@ class LongitudinalAgent(BaseNeuroAgent):
                 "deteriorating_metrics": deteriorating,
                 "improving_metrics": improving,
                 "stable_metrics": stable,
+                "unclassified_metrics": unclassified,
                 "personal_anomalies": personal_anomalies,
                 "narrative_source": narrative_source,
             },

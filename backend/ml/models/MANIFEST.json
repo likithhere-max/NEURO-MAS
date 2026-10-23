@@ -1,0 +1,7 @@
+{
+  "_comment": "SHA-256 of each committed model artifact. joblib files are pickles: loading a tampered file executes arbitrary code. ml_demo refuses to load an artifact whose hash is not listed here. After RETRAINING, regenerate with `python ml/validation/validate_models.py manifest`. Hashes alone do not authenticate the manifest -- protect it with code review.",
+  "sha256": {
+    "parkinsons_demo_classifier.joblib": "048678799e7bbe4e2d4d4b4113eb01b6c1029fd80460f20b2fab23b59cc1cd04",
+    "parkinsons_risk_classifier.joblib": "8ab2957fd07284981207147390ac3b92ccb9e8820961a3781d8ba5b1329226a9"
+  }
+}

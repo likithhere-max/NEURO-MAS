@@ -16,7 +16,7 @@ from typing import TypeVar
 from google import genai
 from google.genai import types
 from pydantic import BaseModel
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.core.config import get_settings
 
@@ -26,6 +26,27 @@ T = TypeVar("T", bound=BaseModel)
 
 _client: genai.Client | None = None
 
+# Per-request network timeout (ms). Audit fix: there was none, so a hung connection could stall a
+# workflow (and therefore an emergency response) indefinitely.
+REQUEST_TIMEOUT_MS = 30_000
+_TRANSIENT_HTTP_CODES = {408, 429, 500, 502, 503, 504}
+
+
+def is_transient_error(exc: BaseException) -> bool:
+    """Retry only failures that can plausibly succeed on retry. Audit fix: previously EVERY exception
+    (bad API key, 400 invalid request, programming errors) was retried 3x with backoff, delaying the
+    fallback path by ~3 s for errors that can never succeed."""
+    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+    if isinstance(code, int):
+        return code in _TRANSIENT_HTTP_CODES
+    try:
+        import httpx
+        if isinstance(exc, httpx.TransportError):
+            return True
+    except ImportError:  # pragma: no cover
+        pass
+    return isinstance(exc, (ConnectionError, TimeoutError))
+
 
 def _get_client() -> genai.Client:
     global _client
@@ -33,7 +54,7 @@ def _get_client() -> genai.Client:
         settings = get_settings()
         if not settings.gemini_api_key:
             raise RuntimeError("GEMINI_API_KEY is not set -- check backend/.env")
-        _client = genai.Client(api_key=settings.gemini_api_key)
+        _client = genai.Client(api_key=settings.gemini_api_key, http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS))
     return _client
 
 
@@ -46,7 +67,7 @@ class GeminiServiceError(Exception):
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=8),
-    retry=retry_if_exception_type(Exception),
+    retry=retry_if_exception(is_transient_error),
     reraise=True,
 )
 def _call_gemini(model: str, contents: str, config: dict):
@@ -107,7 +128,7 @@ def generate_structured(
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=8),
-    retry=retry_if_exception_type(Exception),
+    retry=retry_if_exception(is_transient_error),
     reraise=True,
 )
 def _call_embed(model: str, content: str, dimensions: int):

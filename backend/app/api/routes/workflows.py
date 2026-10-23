@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.supabase_client import get_authed_client
@@ -15,6 +17,25 @@ from app.services.symptom_extraction import (
 )
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
+logger = logging.getLogger("neuromas.workflows")
+
+
+def _persist_or_degrade(client, workflow_state) -> bool:
+    """Persist the workflow. Audit fix (High): persistence is 5+ non-transactional inserts; a failure
+    used to turn into a bare 500 and the computed emergency flag never reached the caller.
+
+    Emergency runs: swallow the persistence error (logged), return the result with persisted=False so
+    the patient is still told. Non-emergency runs: re-raise (nothing safety-critical to salvage).
+    Returns True if persisted."""
+    try:
+        persist_workflow(client, workflow_state)
+        return True
+    except Exception as exc:
+        logger.error("persist_workflow_failed workflow_id=%s emergency=%s error=%r",
+                     workflow_state.workflow_id, workflow_state.is_emergency, exc)
+        if workflow_state.is_emergency:
+            return False
+        raise HTTPException(500, "could not save the assessment; please retry")
 
 
 @router.post("/neurological-assessment/{patient_id}")
@@ -50,7 +71,9 @@ async def trigger_neurological_assessment(
     # dependency within one flush/commit), each Supabase REST call is its own
     # immediate insert -- and observations.workflow_id has a foreign key to
     # workflows.id, so the workflows row has to exist first.
-    persist_workflow(client, workflow_state)
+    persisted = _persist_or_degrade(client, workflow_state)
+    if not persisted:
+        return _serialize_workflow(workflow_state, persisted=False)
 
     # Persist raw observations too, tagged with this workflow id.
     observation_rows = [
@@ -126,7 +149,9 @@ async def trigger_symptom_assessment(
     # Same ordering requirement as trigger_neurological_assessment above:
     # persist_workflow() must run before the observations insert, since
     # observations.workflow_id has a foreign key to workflows.id.
-    persist_workflow(client, workflow_state)
+    persisted = _persist_or_degrade(client, workflow_state)
+    if not persisted:
+        return {"assessment": None, "extracted": extracted.model_dump(), "workflow": _serialize_workflow(workflow_state, persisted=False)}
 
     observation_rows = [
         {
@@ -191,6 +216,8 @@ def get_workflow(workflow_id: str, user: dict = Depends(get_current_user)):
         "started_at": wf["started_at"],
         "completed_at": wf["completed_at"],
         "consensus": wf["result_json"].get("consensus"),
+        "degraded": wf["result_json"].get("degraded", False),
+        "failed_agents": wf["result_json"].get("failed_agents", []),
         "agent_events": [
             {"agent_name": e["agent_name"], "status": e["status"], "confidence": e["confidence"], "result": e["result_json"]}
             for e in events
@@ -203,8 +230,12 @@ def get_workflow(workflow_id: str, user: dict = Depends(get_current_user)):
     }
 
 
-def _serialize_workflow(state) -> dict:
+def _serialize_workflow(state, persisted: bool = True) -> dict:
     return {
+        "persisted": persisted,
+        "degraded": getattr(state, "degraded", False),
+        "failed_agents": getattr(state, "failed_agents", []),
+        "emergency_screen": getattr(state, "emergency_screen", {}),
         "workflow_id": state.workflow_id,
         "patient_id": state.patient_id,
         "status": state.status,

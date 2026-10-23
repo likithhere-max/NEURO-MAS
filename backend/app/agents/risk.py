@@ -143,10 +143,21 @@ class RiskStratificationAgent(BaseNeuroAgent):
         ]
 
         overall = max(factors.values()) if factors else 0.0
-        confidence = 0.65 if any(factors.values()) else 0.3
+        # Honest data sufficiency instead of a constant: share of the 5 risk inputs actually available.
+        inputs_available = {
+            "signal_analysis": bool(signal.get("findings")),
+            "longitudinal": bool(longitudinal.get("findings")),
+            "adherence": state.medication_state.adherence_pct_30d is not None,
+            "seizure_history": bool(state.seizure_history),
+            "diagnostic": bool(top_candidates),
+        }
+        n_avail = sum(inputs_available.values())
+        confidence = round(n_avail / len(inputs_available), 2)  # coverage, NOT a probability
         bucket = _bucket(overall)
 
-        warnings = ["heuristic_score_not_a_validated_clinical_risk_score"]
+        warnings = ["heuristic_score_not_a_validated_clinical_risk_score", "confidence_is_input_coverage_not_probability"]
+        if n_avail <= 1:
+            warnings.append("risk_scores_low_may_reflect_missing_inputs_not_low_risk")
         narrative = await _explain_risk_with_gemini(factors, bucket)
         if narrative:
             reasoning_summary = narrative
@@ -170,6 +181,7 @@ class RiskStratificationAgent(BaseNeuroAgent):
             raw_payload={
                 "heuristic_scores": factors,
                 "overall_bucket": bucket,
+                "inputs_available": inputs_available,
                 "score_type": "heuristic_score",  # explicitly not "validated_clinical_risk_score"
                 "narrative_source": "gemini" if narrative else "template_fallback",
             },

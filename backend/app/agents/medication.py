@@ -22,7 +22,9 @@ from app.agents.base import BaseNeuroAgent
 from app.ai.gemini_service import GeminiServiceError, generate_structured
 from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
-from app.services.clinical_rules import check_allergy_conflicts, check_interactions
+import math
+
+from app.services.clinical_rules import check_allergy_conflicts, check_interactions, unassessed_medications
 
 
 class _MedicationSafetyNarrative(BaseModel):
@@ -108,6 +110,11 @@ class MedicationSafetyAgent(BaseNeuroAgent):
             ))
 
         adherence = state.medication_state.adherence_pct_30d
+        warnings_extra: list[str] = []
+        if adherence is not None and (not isinstance(adherence, (int, float)) or not math.isfinite(adherence) or not (0.0 <= adherence <= 1.0)):
+            # Audit fix: 60 (percent) used to be silently treated as 6000% and never flagged.
+            warnings_extra.append(f"adherence_value_invalid_expected_fraction_0_to_1:{adherence!r}")
+            adherence = None
         if adherence is not None and adherence < 0.8:
             findings.append(AgentFinding(
                 label="adherence_below_threshold",
@@ -116,8 +123,19 @@ class MedicationSafetyAgent(BaseNeuroAgent):
                 value=adherence,
             ))
 
-        has_findings = bool(findings)
-        confidence = 0.8 if has_findings else 0.9  # confident either way; this is a table lookup
+        # Honest coverage: how many active medications are even mentioned in the curated rule table?
+        unassessed = unassessed_medications(active_meds)
+        assessed_n = len(active_meds) - len(unassessed)
+        # Not a probability: fraction of active medications the curated table can say anything about.
+        confidence = round(assessed_n / len(active_meds), 2) if active_meds else 0.0
+        if unassessed:
+            warnings_extra.append("medications_not_covered_by_interaction_table:" + ",".join(unassessed))
+            findings.append(AgentFinding(
+                label="interaction_check_incomplete",
+                detail=f"{len(unassessed)} of {len(active_meds)} active medication(s) are not covered by the curated "
+                       f"interaction table ({', '.join(unassessed)}); absence of a finding does NOT mean they are safe together.",
+                severity="info",
+            ))
 
         template_summary = (
             f"Checked {len(active_meds)} active medication(s) against a curated interaction/"
@@ -125,7 +143,7 @@ class MedicationSafetyAgent(BaseNeuroAgent):
             f"allergy conflict(s). No dose changes are proposed by this agent under any circumstance."
         )
 
-        warnings = ["curated_interaction_table_is_illustrative_not_exhaustive"]
+        warnings = ["curated_interaction_table_is_illustrative_not_exhaustive", "confidence_is_rule_table_coverage_not_probability"] + warnings_extra
         narrative = await _explain_medication_safety_with_gemini(
             len(active_meds), interactions, allergy_hits, adherence,
         )
@@ -149,6 +167,8 @@ class MedicationSafetyAgent(BaseNeuroAgent):
             reasoning_summary=reasoning_summary,
             raw_payload={
                 "interactions": interactions,
+                "unassessed_medications": unassessed,
+                "rule_table_size": 5,
                 "allergy_conflicts": allergy_hits,
                 "adherence_pct_30d": adherence,
                 "action_restriction": "MEDICATION_CHANGES_REQUIRE_CLINICIAN_AUTHORIZATION",

@@ -10,13 +10,18 @@ export default function EvidencePage() {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   async function search() {
     if (!query.trim()) return;
     setSearching(true);
+    setSearchError(null);
     try {
       const res = await api.searchKnowledge(query);
       setSearchResults(res.results || []);
+    } catch (e: any) {
+      setSearchResults(null);
+      setSearchError("Search failed. Please check your connection and try again.");
     } finally {
       setSearching(false);
     }
@@ -49,7 +54,7 @@ export default function EvidencePage() {
                 {c.source_url}
               </a>
               <div className="text-[11px] text-neuro-muted mt-1">
-                Last verified {c.last_verified} — {c.review_status}
+                Last verified {c.last_verified ?? "unknown"} — {c.review_status ?? "review status unknown"}
               </div>
             </div>
           ))}
@@ -73,6 +78,7 @@ export default function EvidencePage() {
             {searching ? "Searching…" : "Search"}
           </button>
         </div>
+        {searchError && <div className="mt-3 text-sm text-neuro-critical">{searchError}</div>}
         {searchResults && (
           <div className="mt-3 space-y-2">
             {searchResults.length === 0 && <div className="text-sm text-neuro-muted">No matches.</div>}

@@ -17,7 +17,30 @@ from __future__ import annotations
 from app.agents.base import BaseNeuroAgent
 from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
-from app.services.clinical_rules import detect_emergency
+from app.services.clinical_rules import detect_emergency_detailed
+
+
+def collect_texts(payload: dict) -> list[str]:
+    """Every free-text-bearing field the patient or caregiver supplied -- from the
+    normalised observations AND the raw input (so a data-intake failure can never
+    blind the emergency scan). Audit fix: previously only `free_text or name` was
+    scanned per observation, so a benign free_text hid an alarming name."""
+    texts: list[str] = []
+    def add(v):
+        if isinstance(v, str) and v.strip():
+            texts.append(v)
+    for key in ("observations", "symptoms"):
+        for o in (payload.get(key) or []):
+            if isinstance(o, dict):
+                for f in ("name", "free_text", "note", "severity", "onset"):
+                    add(o.get(f))
+            else:
+                add(o if isinstance(o, str) else None)
+    add(payload.get("caregiver_notes"))
+    for ml in (payload.get("medication_logs") or []):
+        if isinstance(ml, dict):
+            add(ml.get("note"))
+    return texts
 
 
 class EmergencyEscalationAgent(BaseNeuroAgent):
@@ -27,10 +50,8 @@ class EmergencyEscalationAgent(BaseNeuroAgent):
 
     async def execute(self, task: AgentTask, state: PatientState) -> AgentResult:
         payload = task.input_payload or {}
-        observations = payload.get("observations", [])
-        texts = [o.get("free_text", "") or o.get("name", "") or o.get("note", "") for o in observations]
-
-        is_emergency, matched = detect_emergency(texts)
+        detail = detect_emergency_detailed(collect_texts(payload))
+        is_emergency, matched = detail["is_emergency"], detail["matched"]
 
         findings = []
         if is_emergency:
@@ -45,7 +66,7 @@ class EmergencyEscalationAgent(BaseNeuroAgent):
             task_id=task.task_id,
             status=AgentStatus.COMPLETED,
             findings=findings,
-            confidence=1.0 if is_emergency else 0.0,
+            confidence=1.0 if is_emergency else 0.0,  # rule fired / not fired -- NOT a probability of emergency
             warnings=[],
             recommended_next_agents=[],
             requires_human_review=is_emergency,
@@ -53,5 +74,6 @@ class EmergencyEscalationAgent(BaseNeuroAgent):
                 "Deterministic phrase-matching emergency detector "
                 + ("MATCHED known emergency indicators." if is_emergency else "found no emergency indicators.")
             ),
-            raw_payload={"is_emergency": is_emergency, "matched_phrases": matched},
+            raw_payload={"is_emergency": is_emergency, "matched_phrases": matched,
+                         "families": detail["families"], "negated_matches": detail["negated"]},
         )

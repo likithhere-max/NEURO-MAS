@@ -14,6 +14,8 @@ claude/neuro-mas-architecture-v2.md's two-track ML design):
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 from pathlib import Path
 
@@ -66,6 +68,16 @@ RISK_DISCLAIMER = (
 )
 
 
+def _verified_load(path):
+    """Load a joblib artifact only if its SHA-256 matches ml/models/MANIFEST.json (pickle = code execution)."""
+    manifest_path = MODEL_DIR / "MANIFEST.json"
+    expected = (json.loads(manifest_path.read_text()).get("sha256", {}) if manifest_path.exists() else {}).get(path.name)
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if not expected or not hmac.compare_digest(expected, actual):
+        raise HTTPException(503, "Model artifact failed integrity verification and was not loaded.")
+    return joblib.load(path)
+
+
 def _load_model():
     global _model, _metadata
     if _model is None:
@@ -75,7 +87,7 @@ def _load_model():
                 "Demonstration classifier is not available -- it has not been trained yet. "
                 "Run ml/training/train_parkinsons_classifier.py first.",
             )
-        _model = joblib.load(MODEL_PATH)
+        _model = _verified_load(MODEL_PATH)
         with open(METADATA_PATH) as f:
             _metadata = json.load(f)
     return _model, _metadata
@@ -90,7 +102,7 @@ def _load_risk_model():
                 "Demonstration risk classifier is not available -- it has not been trained yet. "
                 "Run ml/training/train_risk_classifier.py first.",
             )
-        _risk_model = joblib.load(RISK_MODEL_PATH)
+        _risk_model = _verified_load(RISK_MODEL_PATH)
         with open(RISK_METADATA_PATH) as f:
             _risk_metadata = json.load(f)
     return _risk_model, _risk_metadata

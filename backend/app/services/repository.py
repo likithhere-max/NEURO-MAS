@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from supabase import Client
 
+from app.core.metric_semantics import classify_change
 from app.ml.personalized_anomaly import detect_personal_anomaly
 from app.orchestrator.orchestrator import WorkflowState
 from app.schemas.patient_state import (
@@ -83,12 +84,7 @@ def build_patient_state(client: Client, patient: dict) -> PatientState:
             baseline_value=met["baseline_value"],
             current_value=met["current_value"],
             window=met["window"],
-            trend=(
-                "unknown" if met["baseline_value"] is None or met["current_value"] is None
-                else "deteriorating" if met["current_value"] > met["baseline_value"] * 1.05
-                else "improving" if met["current_value"] < met["baseline_value"] * 0.95
-                else "stable"
-            ),
+            trend=classify_change(met["metric"], met["baseline_value"], met["current_value"])["classification"],
             **_anomaly_fields(met["metric"]),
         )
         for met in metrics_rows
@@ -155,9 +151,13 @@ def persist_workflow(client: Client, state: WorkflowState) -> dict:
                 "top_hypothesis": state.consensus.top_hypothesis if state.consensus else None,
                 "disagreement": state.consensus.disagreement if state.consensus else None,
                 "hypotheses": [h.__dict__ for h in state.consensus.hypotheses] if state.consensus else [],
+                "margin": state.consensus.margin if state.consensus else None,
                 "action_permitted": state.consensus.action_permitted if state.consensus else None,
                 "reason": state.consensus.reason if state.consensus else None,
             } if state.consensus else None,
+            "degraded": getattr(state, "degraded", False),
+            "failed_agents": getattr(state, "failed_agents", []),
+            "emergency_screen": getattr(state, "emergency_screen", {}),
         },
     }
     result = client.table("workflows").insert(wf_row).execute()

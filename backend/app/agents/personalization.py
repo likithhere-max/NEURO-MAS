@@ -100,7 +100,9 @@ class PersonalizationAgent(BaseNeuroAgent):
             plan.append(f"Increase monitoring frequency for: {', '.join(longitudinal['deteriorating_metrics'])}")
             reasons.append("deterioration detected in this patient's own longitudinal trend, not a population average")
         if longitudinal.get("improving_metrics"):
-            plan.append(f"Advance rehabilitation tasks for: {', '.join(longitudinal['improving_metrics'])} (patient is improving)")
+            plan.append(f"Clinician to consider progressing rehabilitation tasks for: {', '.join(longitudinal['improving_metrics'])} (metric moved in the favourable direction vs baseline)")
+        if longitudinal.get("unclassified_metrics"):
+            plan.append(f"Clinician review of changed metrics with unknown direction of benefit: {', '.join(longitudinal['unclassified_metrics'])}")
 
         conditions = state.disease_state.conditions
         if conditions:

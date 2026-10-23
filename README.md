@@ -19,18 +19,17 @@ prototype in this build, and `docs/ARCHITECTURE.md` for the full system design.
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python -m app.seed.demo_scenarios     # creates 2 demo patients + runs a full workflow on each
+pip install -r requirements.txt -r requirements-dev.txt
+# configure backend/.env (Supabase + Gemini keys; ENVIRONMENT, CLINICIAN_INVITE_CODE, CORS_ORIGINS) -- see docs/audit/RUN_AND_REPRODUCTION.md
 uvicorn app.main:app --reload --port 8000
 ```
 
 API docs: http://localhost:8000/docs
 
-Run the test suite (31 tests: agent unit tests, orchestrator integration, safety-bypass exhaustive
-checks, consensus math, full HTTP API flow):
+Run the test suite (226 passing + 4 live-Supabase tests skipped by default; see docs/audit/TEST_REPORT.md):
 
 ```bash
-python -m pytest -q
+python -m pytest tests -q --cov=app
 ```
 
 ### Frontend (Next.js dashboard)
@@ -42,8 +41,7 @@ cp .env.local.example .env.local   # points at http://localhost:8000/api/v1 by d
 npm run dev
 ```
 
-Open http://localhost:3000, register as a **clinician**, and you'll see the demo patients (if you
-ran the seed script) or can create a new one. Click a patient, pick a preset scenario (epilepsy
+Open http://localhost:3000, register as a **clinician** (needs `CLINICIAN_INVITE_CODE` unless the backend runs with `ENVIRONMENT=development`) and create a patient. Click a patient, pick a preset scenario (epilepsy
 emergency / Parkinson's deterioration / routine check-in), and click **Trigger assessment** to watch
 the agents run, reach (or fail to reach) consensus, and propose safety-gated actions.
 
@@ -68,15 +66,15 @@ NEURO-MAS/
 │   │   ├── core/          # messaging schema, consensus engine, safety engine, action engine, config
 │   │   ├── orchestrator/  # the conductor
 │   │   ├── schemas/       # Pydantic contracts (PatientState, AgentTask/Result, API I/O)
-│   │   ├── db/            # SQLAlchemy models + session
 │   │   ├── services/      # knowledge base, clinical rules, LLM provider, auth, repository
 │   │   ├── api/routes/    # FastAPI routers
-│   │   └── seed/          # runnable demo scenarios
+│   ├── ml/                 # demo models, training scripts, validation harness (ml/validation)
 │   ├── data/               # curated + raw disease knowledge base (from the uploaded seed pack)
 │   └── tests/
 ├── frontend/                # Next.js 15 + Tailwind dashboard
 └── docs/
     ├── ARCHITECTURE.md
+    ├── audit/               # 2026-10 engineering audit: findings, maths, security, tests, how to reproduce
     ├── ROADMAP.md
     ├── SIMULATED_VS_REAL.md
     └── RESEARCH_PAPER_OUTLINE.md

@@ -48,7 +48,15 @@ export default function AgentActivityPanel({ agentResults }: { agentResults: Rec
                 <div className="text-xs text-neuro-muted max-w-md">{r.reasoning_summary}</div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs text-neuro-muted">conf {Math.round((r.confidence || 0) * 100)}%</span>
+                {(r.warnings || []).some((w: string) => w.startsWith("confidence_is_")) ? (
+                  <span className="text-xs text-neuro-muted" title="Input/rule-table coverage. NOT a probability of being correct.">
+                    coverage {Math.round((r.confidence || 0) * 100)}%
+                  </span>
+                ) : (
+                  <span className="text-xs text-neuro-muted" title="Heuristic agent score. NOT a calibrated probability.">
+                    score {Math.round((r.confidence || 0) * 100)}%
+                  </span>
+                )}
                 <span className={`badge ${style}`}>
                   {STATUS_ICON[r.status] || "•"} {r.status}
                 </span>

@@ -78,5 +78,6 @@ async def send_chat_message(
         "answer": result["answer"],
         "used_context": result["used_context"],
         "warnings": result["warnings"],
+        "is_emergency": bool(result.get("is_emergency", False)),
         "message": saved_assistant_message,
     }

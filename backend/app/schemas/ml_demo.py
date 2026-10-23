@@ -17,7 +17,7 @@ class ParkinsonsVoiceFeaturesIn(BaseModel):
     the field names as-is; the Python attribute names are just sanitized
     versions of the same thing.
     """
-    model_config = {"populate_by_name": True}
+    model_config = {"populate_by_name": True, "allow_inf_nan": False}
 
     mdvp_fo_hz: float = Field(..., alias="MDVP:Fo(Hz)", description="Average vocal fundamental frequency (Hz)")
     mdvp_fhi_hz: float = Field(..., alias="MDVP:Fhi(Hz)", description="Maximum vocal fundamental frequency (Hz)")
@@ -62,7 +62,7 @@ class ParkinsonsRiskFeaturesIn(BaseModel):
     use the Telemonitoring dataset's own column names (no "MDVP:" prefix,
     unlike the voice dataset above) prefixed with "delta_", as JSON aliases.
     """
-    model_config = {"populate_by_name": True}
+    model_config = {"populate_by_name": True, "allow_inf_nan": False}
 
     delta_jitter_pct: float = Field(..., alias="delta_Jitter(%)")
     delta_jitter_abs: float = Field(..., alias="delta_Jitter(Abs)")

@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("demo12345");
   const [fullName, setFullName] = useState("Dr. Demo Clinician");
   const [role, setRole] = useState("clinician");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +21,7 @@ export default function LoginPage() {
     setError(null);
     try {
       if (mode === "register") {
-        await api.register(email, password, fullName, role);
+        await api.register(email, password, fullName, role, inviteCode);
       }
       const data = await api.login(email, password);
       setSession(data.access_token, data.role);
@@ -54,6 +55,11 @@ export default function LoginPage() {
                 <option value="patient">Patient</option>
                 <option value="caregiver">Caregiver</option>
               </select>
+              {role === "clinician" && (
+                <input className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"
+                  placeholder="Clinician invite code (required on deployed servers)" value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)} />
+              )}
             </>
           )}
           <input className="w-full bg-neuro-panel2 border border-neuro-border rounded-lg px-3 py-2 text-sm"

@@ -43,11 +43,17 @@ def get_current_user(
     )
     try:
         signing_key = get_jwks_client().get_signing_key_from_jwt(token)
+        settings = get_settings()
+        decode_kwargs: dict[str, Any] = {"options": {"require": ["exp", "sub"]}}
+        if settings.supabase_url:
+            # Audit fix: reject validly-signed tokens that were issued by a different auth server.
+            decode_kwargs["issuer"] = f"{settings.supabase_url.rstrip('/')}/auth/v1"
         payload = jwt.decode(
             token,
             signing_key.key,
             algorithms=["ES256"],
             audience="authenticated",
+            **decode_kwargs,
         )
     except jwt.PyJWTError:
         raise credentials_exception

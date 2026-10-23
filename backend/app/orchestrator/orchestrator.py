@@ -15,6 +15,7 @@ doesn't otherwise need (see docs/ARCHITECTURE.md, "why not LangGraph").
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -22,10 +23,12 @@ from typing import Any
 
 from app.agents.registry import WORKFLOW_STAGES, all_agents, get_agent
 from app.core.actions import ProposedAction, build_action
+from app.core.config import get_settings
 from app.core.consensus import ConsensusOutcome, compute_consensus
 from app.core.messaging import AgentMessage, MessageType, Priority
 from app.schemas.agent import AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
+from app.services.clinical_rules import detect_emergency_detailed
 
 
 @dataclass
@@ -44,6 +47,10 @@ class WorkflowState:
     started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     completed_at: str | None = None
     status: str = "running"
+    # Audit fix: a run in which agents failed is no longer indistinguishable from a clean run.
+    failed_agents: list[str] = field(default_factory=list)
+    degraded: bool = False
+    emergency_screen: dict[str, Any] = field(default_factory=dict)
 
 
 def _log(state: WorkflowState, event: str, detail: dict[str, Any]) -> None:
@@ -70,6 +77,24 @@ async def run_workflow(
         patient_state=patient_state,
     )
     _log(state, "workflow_started", {"trigger_reason": trigger_reason})
+
+    # Independent deterministic emergency pre-scan on the RAW input. It runs
+    # before any agent/LLM call and does not depend on data_intake or the
+    # emergency agent succeeding. Fail-CLOSED: if the scan itself errors we
+    # treat the case as a possible emergency (over-triage beats a missed stroke).
+    from app.agents.emergency import collect_texts
+    try:
+        prescan = detect_emergency_detailed(collect_texts(input_payload or {}))
+        state.emergency_screen = {"source": "prescan", **prescan}
+        if prescan["is_emergency"]:
+            state.is_emergency = True
+    except Exception as exc:
+        state.emergency_screen = {"source": "prescan", "is_emergency": True, "matched": [], "error": repr(exc),
+                                  "note": "emergency screen crashed -> fail-closed"}
+        state.is_emergency = True
+    _log(state, "emergency_prescan", {k: v for k, v in state.emergency_screen.items() if k != "negated"})
+
+    timeout_s = get_settings().agent_timeout_seconds
 
     for stage_agents in WORKFLOW_STAGES:
         for agent_name in stage_agents:
@@ -107,18 +132,21 @@ async def run_workflow(
             ))
 
             try:
-                result = await agent.execute(task, patient_state)
-            except Exception as exc:  # never let one agent crash the workflow
+                result = await asyncio.wait_for(agent.execute(task, patient_state), timeout=timeout_s)
+            except Exception as exc:  # never let one agent crash the workflow (incl. TimeoutError)
+                state.failed_agents.append(agent_name)
                 result = AgentResult(
                     agent_name=agent_name,
                     task_id=task.task_id,
                     status=AgentStatus.FAILED,
                     warnings=[f"agent_exception:{exc!r}"],
                     requires_human_review=True,
-                    reasoning_summary=f"Agent raised an exception; degraded mode -- workflow continues without this agent's input.",
+                    reasoning_summary="Agent raised an exception; degraded mode -- workflow continues without this agent's input.",
                 )
                 _log(state, "agent_failed", {"agent": agent_name, "error": repr(exc)})
 
+            if result.status == AgentStatus.FAILED and agent_name not in state.failed_agents:
+                state.failed_agents.append(agent_name)
             state.agent_results[agent_name] = result
             state.messages.append(AgentMessage(
                 workflow_id=workflow_id, patient_id=patient_id,
@@ -133,7 +161,13 @@ async def run_workflow(
             })
 
             if agent_name == "emergency_escalation_agent":
-                state.is_emergency = bool(result.raw_payload.get("is_emergency"))
+                # OR with the independent pre-scan; a FAILED emergency agent can never clear the flag.
+                state.is_emergency = state.is_emergency or bool(result.raw_payload.get("is_emergency"))
+                if result.status == AgentStatus.FAILED:
+                    state.is_emergency = True  # fail-closed: the safety-critical agent did not complete
+                    result.raw_payload.setdefault("is_emergency", True)
+                    result.raw_payload["failed_closed"] = True
+                    _log(state, "emergency_agent_failed_closed", {"agent": agent_name})
                 if state.is_emergency:
                     state.messages.append(AgentMessage(
                         workflow_id=workflow_id, patient_id=patient_id,
@@ -147,10 +181,14 @@ async def run_workflow(
     # --- Conflict detection + consensus -------------------------------
     diagnostic = state.agent_results.get("neuro_diagnostic_agent")
     candidates = (diagnostic.raw_payload.get("candidate_conditions", []) if diagnostic else [])
-    hypotheses = {c["preferred_name"]: [
-        "neuro_diagnostic_agent",
-        *[n for n in ("signal_analysis_agent", "longitudinal_agent", "risk_stratification_agent") if n in state.agent_results],
-    ] for c in candidates[:3]}
+    # Only the diagnostic agent produces a hypothesis-specific score (retrieval similarity of
+    # THAT candidate). Signal/longitudinal/risk produce patient-level findings that are not tied
+    # to a named disease, so they ABSTAIN rather than vote with an unrelated global confidence.
+    # The knowledge agent only looks up the same candidates (circular), so it does not vote either.
+    hypotheses = {c["preferred_name"]: ["neuro_diagnostic_agent"] for c in candidates[:3]}
+    hypothesis_support = {
+        c["preferred_name"]: {"neuro_diagnostic_agent": float(c.get("confidence", 0.0))} for c in candidates[:3]
+    }
 
     conflicts = []
     if diagnostic and diagnostic.raw_payload.get("red_flags"):
@@ -164,6 +202,7 @@ async def run_workflow(
             data_quality=state.agent_results.get("data_intake_agent").raw_payload.get("data_quality", 0.5)
             if "data_intake_agent" in state.agent_results else 0.5,
             hypotheses=hypotheses,
+            hypothesis_support=hypothesis_support,
         )
         _log(state, "consensus_computed", {
             "top_hypothesis": state.consensus.top_hypothesis,
@@ -224,7 +263,9 @@ async def run_workflow(
         state.proposed_actions.insert(0, emergency_action)
         _log(state, "emergency_action_proposed", {"action_id": emergency_action.action_id})
 
-    state.status = "completed"
+    state.degraded = bool(state.failed_agents)
+    state.status = "completed"  # kept for DB/API compatibility; use `degraded` / `failed_agents` for run health
     state.completed_at = datetime.now(timezone.utc).isoformat()
-    _log(state, "workflow_completed", {"num_actions": len(state.proposed_actions)})
+    _log(state, "workflow_completed", {"num_actions": len(state.proposed_actions),
+                                      "degraded": state.degraded, "failed_agents": state.failed_agents})
     return state

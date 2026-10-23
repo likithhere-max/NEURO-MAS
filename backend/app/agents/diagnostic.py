@@ -84,6 +84,9 @@ async def _explain_diagnosis_with_gemini(candidates: list[dict], red_flags: list
         return None
 
 
+PLACEHOLDER_SYMPTOM_NAMES = {"patient-reported symptoms (verbatim)"}
+
+
 class NeuroDiagnosticAgent(BaseNeuroAgent):
     name = "neuro_diagnostic_agent"
     capabilities = ["differential_diagnosis", "syndrome_matching"]
@@ -91,11 +94,19 @@ class NeuroDiagnosticAgent(BaseNeuroAgent):
 
     async def execute(self, task: AgentTask, state: PatientState) -> AgentResult:
         observations = (task.input_payload or {}).get("observations", [])
-        symptom_terms = [
-            o.get("name") or o.get("free_text", "")
-            for o in observations
-            if o.get("modality") == "symptom"
-        ]
+        # Audit fix (High): `name or free_text` meant the placeholder name "patient-reported symptoms
+        # (verbatim)" (see symptom_extraction) was used as the retrieval query while the patient's actual
+        # words in free_text were IGNORED. Query with the real name AND the free text, never the placeholder.
+        symptom_terms = []
+        for o in observations:
+            if not isinstance(o, dict) or o.get("modality") != "symptom":
+                continue
+            name = (o.get("name") or "").strip()
+            if name and name.lower() not in PLACEHOLDER_SYMPTOM_NAMES:
+                symptom_terms.append(name)
+            free_text = (o.get("free_text") or "").strip()
+            if free_text and free_text not in symptom_terms:
+                symptom_terms.append(free_text)
         symptom_terms = [t for t in symptom_terms if t]
         known_conditions = state.disease_state.conditions or []
 

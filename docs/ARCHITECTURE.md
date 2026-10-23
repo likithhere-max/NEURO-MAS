@@ -150,11 +150,11 @@ decision space is unit-testable (`backend/tests/test_safety.py` exhaustively cov
 ## 7. Data model
 
 `backend/app/schemas/patient_state.py` implements the P_t = [D_t, S_t, M_t, R_t, B_t, C_t, A_t, E_t]
-vector from section 36 as named, inspectable sub-objects (not an opaque float array), persisted via
-SQLAlchemy models in `backend/app/db/models.py` (`Patient`, `Condition`, `Observation`, `Medication`,
-`Allergy`, `LongitudinalMetric`, `Workflow`, `AgentEventLog`, `Alert`, `ActionRecord`, `AuditEvent`).
-Default database is SQLite (zero-setup for a student project); switching `DATABASE_URL` to Postgres
-is a config change, not a rewrite.
+vector from section 36 as named, inspectable sub-objects (not an opaque float array), persisted in **Supabase (Postgres)** through `backend/app/services/repository.py`
+(`profiles`, `patients`, `conditions`, `observations`, `medications`, `allergies`, `longitudinal_metrics`,
+`metric_readings`, `workflows`, `agent_event_log`, `alerts`, `actions`, `audit_events`, `symptom_assessments`, `chat_messages`). The schema and Row-Level-Security policies
+live in the Supabase project and are **not in this repository** (see `docs/audit/OUTSTANDING_ISSUES.md` O1).
+The earlier SQLAlchemy/SQLite layer was dead code and was removed. Writes are several separate inserts, not one transaction.
 
 ## 8. Title-lock check for this build
 

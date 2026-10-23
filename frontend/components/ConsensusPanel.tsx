@@ -15,7 +15,8 @@ export default function ConsensusPanel({ consensus }: { consensus: any }) {
       <h2 className="font-semibold mb-1">Consensus Panel</h2>
       <div className="text-xs text-neuro-muted mb-3">
         Weighted consensus over agent hypotheses — not a validated clinical
-        scoring formula, an auditable aggregation of this run's agent outputs.
+        scoring formula and not a disease probability. Only agents that give a
+        score for a specific condition vote; the rest abstain (listed below).
       </div>
       <div className="space-y-2 mb-3">
         {hyps.map((h: any) => (
@@ -31,7 +32,8 @@ export default function ConsensusPanel({ consensus }: { consensus: any }) {
               />
             </div>
             <div className="text-[11px] text-neuro-muted mt-1">
-              agents: {h.contributing_agents?.join(", ")}
+              voters: {h.contributing_agents?.join(", ") || "none"}
+              {h.abstained_agents?.length ? ` · abstained: ${h.abstained_agents.join(", ")}` : ""}
             </div>
           </div>
         ))}
@@ -39,6 +41,9 @@ export default function ConsensusPanel({ consensus }: { consensus: any }) {
       <div className="flex items-center justify-between border-t border-neuro-border pt-3 text-sm">
         <div>
           Disagreement: <span className="font-semibold">{Math.round((consensus.disagreement || 0) * 100)}%</span>
+          {consensus.margin != null && (
+            <span className="text-neuro-muted"> · lead over runner-up {Math.round(consensus.margin * 100)} pts</span>
+          )}
         </div>
         <span className={`badge ${consensus.action_permitted ? "badge-ok" : "badge-warn"}`}>
           {consensus.action_permitted ? "autonomous action permitted" : "additional analysis required"}

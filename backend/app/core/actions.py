@@ -13,9 +13,9 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
 
 from app.core.safety import SafetyDecision, evaluate_action
+from app.services.notifier import get_provider
 
 # Maps a free-text personalization plan item to a concrete action_type in
 # the safety catalog. A real system would have the personalization agent
@@ -55,7 +55,7 @@ class ProposedAction:
     autonomy_level: int
     requires_human_approval: bool
     approved_by: str | None
-    status: str  # "proposed" | "executed" | "pending_approval" | "rejected"
+    status: str  # "proposed" | "executed" (ONLY if delivery confirmed) | "pending_approval" | "rejected"
     created_at: str
     safety_reasons: list[str] = field(default_factory=list)
 
@@ -93,11 +93,26 @@ def build_action(
         clinician_restricted_actions=clinician_restricted_actions,
     )
 
+    # Audit fix (Critical): "executed" is only claimed when a notification
+    # provider confirms delivery. With no channel configured (the default) a
+    # permitted action stays "proposed" and says so in safety_reasons.
     status = "proposed"
+    delivery_note: str | None = None
     if decision.requires_human_approval:
         status = "pending_approval"
     elif decision.permitted_autonomously:
-        status = "executed"  # low-risk/notification actions execute immediately in this prototype
+        try:
+            delivery = get_provider().deliver(
+                action_type=action_type, patient_id=patient_id, workflow_id=workflow_id, message=reason,
+            )
+        except Exception as exc:  # a failing provider must never crash the workflow or fake success
+            delivery = None
+            delivery_note = f"delivery_failed:{exc!r}"
+        if delivery is not None and delivery.delivered:
+            status = "executed"
+            delivery_note = f"delivered_via:{delivery.channel}"
+        elif delivery is not None:
+            delivery_note = f"NOT_DELIVERED:{delivery.detail}"
 
     return ProposedAction(
         action_id=str(uuid.uuid4()),
@@ -112,5 +127,5 @@ def build_action(
         approved_by=None,
         status=status,
         created_at=datetime.now(timezone.utc).isoformat(),
-        safety_reasons=decision.reasons,
+        safety_reasons=list(decision.reasons) + ([delivery_note] if delivery_note else []),
     )

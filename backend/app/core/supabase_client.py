@@ -57,3 +57,15 @@ def get_authed_client(access_token: str) -> Client:
     client = create_client(settings.supabase_url, settings.supabase_publishable_key)
     client.postgrest.auth(access_token)
     return client
+
+def new_public_client() -> Client:
+    """A FRESH (uncached) publishable-key client.
+
+    Use for sign-in/sign-up flows. supabase-py stores the signed-in session ON the client object, so
+    signing in through the cached process-wide client from get_supabase_public_client() lets one user's
+    session bleed into concurrent requests (audit finding, High). Never share this instance.
+    """
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_publishable_key:
+        raise RuntimeError("Supabase is not configured. Check SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in backend/.env.")
+    return create_client(settings.supabase_url, settings.supabase_publishable_key)

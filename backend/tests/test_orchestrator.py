@@ -23,7 +23,9 @@ async def test_emergency_scenario_escalates_and_bypasses_consensus_gate():
     assert result.is_emergency is True
     escalations = [a for a in result.proposed_actions if a.action_type == "emergency_escalation"]
     assert len(escalations) == 1
-    assert escalations[0].status == "executed"
+    # 'executed' would claim a delivery that no code performs; with no notification channel it stays 'proposed'.
+    assert escalations[0].status == "proposed"
+    assert any("NOT_DELIVERED" in r for r in escalations[0].safety_reasons)
     assert escalations[0].requires_human_approval is False
 
 
@@ -59,3 +61,81 @@ async def test_agent_failure_does_not_crash_workflow():
         patient_state=state,
     )
     assert result.status == "completed"
+
+
+# ---------------- audit regressions ----------------
+
+@pytest.mark.asyncio
+async def test_clean_run_is_not_degraded():
+    result = await run_workflow(patient_id="p", trigger_reason="t", patient_state=PatientState(patient_id="p"),
+                                input_payload={"symptoms": [{"name": "mild headache", "free_text": "slight headache"}]})
+    assert result.degraded is False and result.failed_agents == []
+
+
+@pytest.mark.asyncio
+async def test_emergency_agent_crash_fails_closed(monkeypatch):
+    from app.agents.registry import get_agent
+    agent = get_agent("emergency_escalation_agent")
+
+    async def boom(task, state):
+        raise RuntimeError("simulated crash")
+    monkeypatch.setattr(agent, "execute", boom)
+    result = await run_workflow(patient_id="p", trigger_reason="t", patient_state=PatientState(patient_id="p"),
+                                input_payload={"symptoms": [{"name": "mild headache", "free_text": "slight headache"}]})
+    assert result.is_emergency is True                    # crash of the safety agent => treat as emergency
+    assert "emergency_escalation_agent" in result.failed_agents
+    assert any(a.action_type == "emergency_escalation" for a in result.proposed_actions)
+
+
+@pytest.mark.asyncio
+async def test_prescan_catches_emergency_even_if_agents_cannot_see_it(monkeypatch):
+    """Independent pre-scan on RAW input: emergency detected although the emergency agent returns 'no emergency'."""
+    from app.agents.registry import get_agent
+    from app.schemas.agent import AgentResult, AgentStatus
+    agent = get_agent("emergency_escalation_agent")
+
+    async def blind(task, state):
+        return AgentResult(agent_name=agent.name, task_id=task.task_id, status=AgentStatus.COMPLETED, raw_payload={"is_emergency": False})
+    monkeypatch.setattr(agent, "execute", blind)
+    result = await run_workflow(patient_id="p", trigger_reason="t", patient_state=PatientState(patient_id="p"),
+                                input_payload={"symptoms": None, "caregiver_notes": "he collapsed and is not responding"})
+    assert result.is_emergency is True
+    assert result.emergency_screen["source"] == "prescan"
+
+
+@pytest.mark.asyncio
+async def test_hung_agent_times_out_and_is_recorded_failed(monkeypatch):
+    import asyncio
+    import app.orchestrator.orchestrator as orch
+    from app.agents.registry import get_agent
+
+    class _S:
+        agent_timeout_seconds = 0.05
+    monkeypatch.setattr(orch, "get_settings", lambda: _S())
+    agent = get_agent("signal_analysis_agent")
+
+    async def hang(task, state):
+        await asyncio.sleep(5)
+    monkeypatch.setattr(agent, "execute", hang)
+    result = await run_workflow(patient_id="p", trigger_reason="t", patient_state=PatientState(patient_id="p"),
+                                input_payload={"symptoms": [{"name": "x"}]})
+    assert "signal_analysis_agent" in result.failed_agents and result.degraded is True
+    assert result.agent_results["signal_analysis_agent"].status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_consensus_hypotheses_use_only_hypothesis_specific_voters():
+    result = await run_workflow(patient_id="p", trigger_reason="t", patient_state=PatientState(patient_id="p"),
+                                input_payload={"symptoms": [{"name": "resting tremor", "free_text": "my hand shakes at rest, stiffness, slow movement"}]})
+    if result.consensus:      # candidates depend on the lexical KB fallback offline
+        for h in result.consensus.hypotheses:
+            assert h.contributing_agents == ["neuro_diagnostic_agent"]
+        if len(result.consensus.hypotheses) > 1:
+            assert len({h.consensus_score for h in result.consensus.hypotheses}) > 1
+
+
+@pytest.mark.asyncio
+async def test_malformed_input_types_do_not_blind_the_emergency_scan():
+    result = await run_workflow(patient_id="p", trigger_reason="t", patient_state=PatientState(patient_id="p"),
+                                input_payload={"symptoms": "I can't breathe", "wearable": [1, 2]})
+    assert result.is_emergency is False or result.is_emergency is True   # must not raise

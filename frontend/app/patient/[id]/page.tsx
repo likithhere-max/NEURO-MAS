@@ -54,6 +54,17 @@ export default function PatientDashboard() {
         </div>
       )}
 
+      {latestWorkflow.persisted === false && (
+        <div className="rounded-lg border border-neuro-critical bg-neuro-critical/10 px-4 py-3 text-sm text-neuro-critical">
+          This result could not be saved to the record. Do not rely on it appearing in history; repeat the assessment later.
+        </div>
+      )}
+      {latestWorkflow.degraded && (
+        <div className="rounded-lg border border-neuro-warn bg-neuro-warn/10 px-4 py-3 text-sm">
+          Incomplete analysis: {(latestWorkflow.failed_agents || []).join(", ")} did not complete. Treat the findings below as partial.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card">
           <div className="text-xs text-neuro-muted mb-1">Main symptoms reported</div>

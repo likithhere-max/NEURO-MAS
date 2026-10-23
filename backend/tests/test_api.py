@@ -12,11 +12,21 @@ so reruns with the same hardcoded test email are fine -- signup fails
 silently (already registered) and the login assertion right after it is
 what actually matters.
 """
+import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import get_settings
 from app.main import app
 
 client = TestClient(app)
+
+# These tests hit the LIVE Supabase project + Gemini. They are skipped unless explicitly enabled so the default
+# suite is hermetic. Enable with:  NEUROMAS_LIVE_TESTS=1 pytest tests/test_api.py   (creates real rows!)
+import os
+pytestmark = pytest.mark.skipif(
+    os.environ.get("NEUROMAS_LIVE_TESTS") != "1" or not get_settings().supabase_url,
+    reason="live Supabase/Gemini tests disabled (set NEUROMAS_LIVE_TESTS=1 and configure backend/.env)",
+)
 
 
 def _register_and_login(role="clinician", email="doc@example.com"):

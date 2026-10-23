@@ -13,12 +13,6 @@ class Settings(BaseSettings):
     app_name: str = "NEURO-MAS"
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
-    # --- Database ---
-    # Defaults to a local SQLite file so the project runs with zero external
-    # infrastructure for academic/demo purposes. Point DATABASE_URL at a
-    # Postgres instance (e.g. postgresql+psycopg://...) for production use --
-    # the SQLAlchemy models are written to be portable across both.
-    database_url: str = "sqlite:///./neuromas.db"
     # --- Supabase ---
     supabase_url: str = ""
     supabase_publishable_key: str = ""
@@ -48,6 +42,18 @@ class Settings(BaseSettings):
     # --- Safety / consensus tuning (explicitly NOT claimed to be clinically validated) ---
     consensus_disagreement_threshold: float = 0.4
     min_confidence_for_autonomous_action: float = 0.6
+    # Per-agent wall-clock limit (seconds). An agent that exceeds it is recorded as FAILED,
+    # never allowed to stall the emergency path indefinitely.
+    agent_timeout_seconds: float = 60.0
+    # Hard limits on patient-supplied free text (abuse / cost / prompt-injection surface).
+    max_free_text_chars: int = 5000
+    max_chat_message_chars: int = 2000
+    # --- Account security ---
+    # Clinicians can approve restricted actions, so self-registering as one must not be open to
+    # the internet. If CLINICIAN_INVITE_CODE is set, clinician signup requires it. If it is NOT
+    # set, clinician self-signup is allowed only when ENVIRONMENT=development (local demos).
+    clinician_invite_code: str = ""
+    auth_rate_limit_per_minute: int = 10
     # --- CORS ---
     # "*" added 2026-09-02 as a same-day-review convenience: the frontend is
     # being hosted on Netlify (URL not known/fixed yet) and the backend is

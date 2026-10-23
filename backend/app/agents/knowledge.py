@@ -89,10 +89,14 @@ class KnowledgeAgent(BaseNeuroAgent):
         citations = []
         evidence_summaries = []
 
+        matched_candidates = 0
         for c in candidates[:3]:
             record = kb.get(c["disease_id"])
             if not record:
                 continue
+            matched_candidates += 1
+            # Strength = the candidate's own retrieval relevance (previously a constant 0.7 for every source).
+            relevance = round(min(max(float(c.get("retrieval_score", 0.0)), 0.0), 1.0), 2)
             source_count = len(record.get("source_urls", []))
             for url in record.get("source_urls", []):
                 citations.append({
@@ -105,7 +109,7 @@ class KnowledgeAgent(BaseNeuroAgent):
                     source_type="knowledge_base",
                     description=f"{record['preferred_name']}: {record.get('definition', '')[:180]}",
                     reference=url,
-                    strength=0.7,
+                    strength=relevance,
                 ))
             findings.append(AgentFinding(
                 label=f"evidence:{record['preferred_name']}",
@@ -132,7 +136,8 @@ class KnowledgeAgent(BaseNeuroAgent):
             )
 
         narrative = await _explain_evidence_with_gemini(evidence_summaries)
-        warnings = ["knowledge_base_is_a_curated_prototype_subset_not_a_full_literature_index"]
+        warnings = ["knowledge_base_is_a_curated_prototype_subset_not_a_full_literature_index", "confidence_is_kb_coverage_not_probability",
+                    "citations_are_url_lookups_no_passage_level_verification_of_claims"]
         if narrative:
             reasoning_summary = narrative
             narrative_source = "gemini"
@@ -149,7 +154,8 @@ class KnowledgeAgent(BaseNeuroAgent):
             task_id=task.task_id,
             status=AgentStatus.COMPLETED,
             findings=findings,
-            confidence=0.75,
+            # Coverage, NOT a probability: share of the (<=3) candidates that have a curated KB entry.
+            confidence=round(matched_candidates / max(len(candidates[:3]), 1), 2),
             evidence=evidence,
             warnings=warnings,
             recommended_next_agents=[],

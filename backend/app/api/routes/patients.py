@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.supabase_client import get_authed_client
+from app.core.supabase_client import get_supabase_admin_client, get_authed_client
 from app.schemas.api import (
     AllergyIn,
     ConditionIn,
@@ -34,6 +36,26 @@ def _fetch_condition_names(client, patient_id: str) -> list[str]:
 
 # -- MIGRATED to Supabase (real RLS, real auth) -----------------------------
 
+def _resolve_clinician_id(requested: str | None, user: dict, caller_role: str) -> str | None:
+    """Audit fix: `clinician_id` was taken verbatim from the request body, so a caller could attach a
+    patient record to ANY clinician id. A clinician always owns their own patients; anyone else may only
+    name an id that really belongs to a clinician profile."""
+    if caller_role == "clinician":
+        if requested and requested != user["sub"]:
+            raise HTTPException(403, "a clinician can only create patients assigned to themselves")
+        return user["sub"]
+    if not requested:
+        return None
+    try:
+        uuid.UUID(requested)
+    except ValueError:
+        raise HTTPException(422, "clinician_id must be a UUID")
+    rows = get_supabase_admin_client().table("profiles").select("role").eq("id", requested).execute().data
+    if not rows or rows[0]["role"] != "clinician":
+        raise HTTPException(422, "clinician_id does not refer to a clinician")
+    return requested
+
+
 @router.post("", response_model=PatientOut)
 def create_patient(payload: PatientCreate, user: dict = Depends(get_current_user)):
     client = get_authed_client(user["_access_token"])
@@ -45,7 +67,7 @@ def create_patient(payload: PatientCreate, user: dict = Depends(get_current_user
         "sex": payload.sex,
         "preferred_language": payload.preferred_language,
         "user_id": user["sub"] if caller_role == "patient" else None,
-        "clinician_id": payload.clinician_id or (user["sub"] if caller_role == "clinician" else None),
+        "clinician_id": _resolve_clinician_id(payload.clinician_id, user, caller_role),
     }
     result = client.table("patients").insert(row).execute()
     if not result.data:

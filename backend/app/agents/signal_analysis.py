@@ -12,6 +12,7 @@ extracted upstream by the device/SDK), since that's arithmetic, not inference.
 from __future__ import annotations
 
 import asyncio
+import math
 
 from pydantic import BaseModel
 
@@ -21,7 +22,10 @@ from app.schemas.agent import AgentFinding, AgentResult, AgentStatus, AgentTask
 from app.schemas.patient_state import PatientState
 
 # Modalities with a real (even if simple) analyzer implemented in this prototype.
-SUPPORTED_SUMMARY_METRICS = {"tremor_amplitude", "gait_speed_m_s", "steps", "heart_rate_avg"}
+# Only metrics with an actual analyzer below. (Audit fix: "steps" and "heart_rate_avg" were listed
+# here although nothing analysed them, so the summary claimed they were "evaluated".)
+SUPPORTED_SUMMARY_METRICS = {"tremor_amplitude", "gait_speed_m_s"}
+RECORDED_ONLY_METRICS = {"steps", "heart_rate_avg"}  # stored/validated upstream, not analysed here
 
 # Modalities explicitly requested by the spec that require a trained model
 # NEURO-MAS does not ship (clinical-grade EEG anomaly detection, video-derived
@@ -100,33 +104,58 @@ class SignalAnalysisAgent(BaseNeuroAgent):
             if key in UNSUPPORTED_MODALITIES:
                 model_not_available.append(key)
 
-        tremor = wearable.get("tremor_amplitude")
-        if tremor is not None:
-            baseline = (state.wearable_metrics or {}).get("tremor_amplitude_baseline")
-            severity = "info"
-            if baseline is not None and tremor > baseline * 1.5:
-                severity = "high"
-                findings.append(AgentFinding(
-                    label="tremor_increase",
-                    detail=f"Tremor amplitude {tremor} vs baseline {baseline} (+{round((tremor/baseline-1)*100,1)}%)",
-                    severity=severity,
-                    value=tremor,
-                ))
-            else:
-                findings.append(AgentFinding(label="tremor_amplitude", detail=f"{tremor} (baseline {baseline})", severity="info", value=tremor))
+        def _num(v):
+            return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
 
-        gait = wearable.get("gait_speed_m_s")
-        if gait is not None:
-            baseline_gait = (state.wearable_metrics or {}).get("gait_speed_baseline")
-            if baseline_gait is not None and gait < baseline_gait * 0.8:
-                findings.append(AgentFinding(
-                    label="gait_slowing",
-                    detail=f"Gait speed {gait} m/s vs baseline {baseline_gait} m/s (-{round((1-gait/baseline_gait)*100,1)}%)",
-                    severity="medium",
-                    value=gait,
-                ))
+        compared = 0
+        evaluated: list[str] = []
+        tremor_raw = wearable.get("tremor_amplitude")
+        if tremor_raw is not None:
+            tremor = _num(tremor_raw)
+            baseline = _num((state.wearable_metrics or {}).get("tremor_amplitude_baseline"))
+            if tremor is None:
+                warnings.append("invalid_value:tremor_amplitude")
             else:
-                findings.append(AgentFinding(label="gait_speed", detail=f"{gait} m/s", severity="info", value=gait))
+                evaluated.append("tremor_amplitude")
+                if baseline is not None and baseline > 0:
+                    compared += 1
+                    if tremor > baseline * 1.5:
+                        findings.append(AgentFinding(
+                            label="tremor_increase",
+                            detail=f"Tremor amplitude {tremor} vs baseline {baseline} (+{round((tremor/baseline-1)*100,1)}%)",
+                            severity="high", value=tremor,
+                        ))
+                    else:
+                        findings.append(AgentFinding(label="tremor_amplitude", detail=f"{tremor} (baseline {baseline})", severity="info", value=tremor))
+                else:
+                    warnings.append("tremor_baseline_missing_or_nonpositive_no_relative_comparison")
+                    findings.append(AgentFinding(label="tremor_amplitude", detail=f"{tremor} (no usable baseline)", severity="info", value=tremor))
+
+        gait_raw = wearable.get("gait_speed_m_s")
+        if gait_raw is not None:
+            gait = _num(gait_raw)
+            baseline_gait = _num((state.wearable_metrics or {}).get("gait_speed_baseline"))
+            if gait is None:
+                warnings.append("invalid_value:gait_speed_m_s")
+            else:
+                evaluated.append("gait_speed_m_s")
+                if baseline_gait is not None and baseline_gait > 0:
+                    compared += 1
+                    if gait < baseline_gait * 0.8:
+                        findings.append(AgentFinding(
+                            label="gait_slowing",
+                            detail=f"Gait speed {gait} m/s vs baseline {baseline_gait} m/s (-{round((1-gait/baseline_gait)*100,1)}%)",
+                            severity="medium", value=gait,
+                        ))
+                    else:
+                        findings.append(AgentFinding(label="gait_speed", detail=f"{gait} m/s", severity="info", value=gait))
+                else:
+                    warnings.append("gait_baseline_missing_or_nonpositive_no_relative_comparison")
+                    findings.append(AgentFinding(label="gait_speed", detail=f"{gait} m/s (no usable baseline)", severity="info", value=gait))
+
+        recorded_only = [k for k in wearable if k in RECORDED_ONLY_METRICS]
+        if recorded_only:
+            warnings.append("recorded_but_not_analysed:" + ",".join(recorded_only))
 
         if model_not_available:
             warnings.append(
@@ -135,12 +164,13 @@ class SignalAnalysisAgent(BaseNeuroAgent):
                 "raw data is stored for future analysis but no prediction is produced."
             )
 
-        confidence = 0.55 if findings else 0.0
+        # Not a probability: share of evaluated metrics that had a usable baseline to compare against.
+        confidence = round(compared / len(evaluated), 2) if evaluated else 0.0
         status = AgentStatus.COMPLETED if findings or model_not_available else AgentStatus.SKIPPED
 
         template_summary = (
-            f"Evaluated {len([k for k in wearable if k in SUPPORTED_SUMMARY_METRICS])} supported summary "
-            f"metric(s) via simple threshold comparison against the patient's stored baseline. "
+            f"Evaluated {len(evaluated)} supported summary metric(s) ({', '.join(evaluated) or 'none'}); "
+            f"{compared} had a usable baseline for threshold comparison (unvalidated 1.5x / 0.8x thresholds). "
             f"{len(model_not_available)} modality/modalities had no available model."
         )
 
@@ -171,5 +201,6 @@ class SignalAnalysisAgent(BaseNeuroAgent):
             recommended_next_agents=["longitudinal_agent", "risk_stratification_agent"],
             requires_human_review=any(f.severity in {"high", "critical"} for f in findings),
             reasoning_summary=reasoning_summary,
-            raw_payload={"model_not_available": model_not_available, "narrative_source": narrative_source},
+            raw_payload={"model_not_available": model_not_available, "narrative_source": narrative_source,
+                         "evaluated_metrics": evaluated, "recorded_only_metrics": recorded_only, "metrics_with_baseline": compared},
         )

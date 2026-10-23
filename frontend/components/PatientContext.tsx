@@ -53,6 +53,8 @@ function normalizeWorkflowFromGet(wf: any) {
     started_at: wf.started_at,
     completed_at: wf.completed_at,
     consensus: wf.consensus,
+    degraded: wf.degraded,
+    failed_agents: wf.failed_agents,
     agent_results,
     proposed_actions: wf.actions || [],
     audit_trail: wf.audit_trail || [],
@@ -153,7 +155,7 @@ export function PatientProvider({ patientId, children }: { patientId: string; ch
     setChatHistory((prev) => [...prev, { role: "user", content: message, created_at: new Date().toISOString() }]);
     try {
       const result = await api.sendChat(patientId, message);
-      setChatHistory((prev) => [...prev, { role: "assistant", content: result.answer, created_at: new Date().toISOString() }]);
+      setChatHistory((prev) => [...prev, { role: "assistant", content: result.answer, created_at: new Date().toISOString(), is_emergency: !!result.is_emergency } as any]);
     } catch (e: any) {
       setChatHistory((prev) => [
         ...prev,

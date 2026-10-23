@@ -1,77 +1,121 @@
 """
 Personalized within-patient longitudinal anomaly detection (Roadmap item 6,
 Track 1). Pure statistics on ONE patient's own historical readings for a
-single metric -- this is deliberately NOT a trained model and NOT a
-population classifier. It answers "is this reading unusual for THIS
-person specifically," using that person's own mean and standard deviation
-as the reference point -- which is honest even with a tiny amount of data,
-unlike a population-level diagnostic model would be (see
-claude/neuro-mas-architecture-v2.md, "ML" section).
+single metric -- deliberately NOT a trained model and NOT a population
+classifier.
+
+Audit fix (High): the original rule flagged |z| >= 2 using the sample SD of
+the history. For a NEW observation that is not a valid 95% test: it ignores
+(a) the uncertainty of the estimated mean/SD (Student-t, n-1 d.f.) and
+(b) the extra variance of a single future point (factor sqrt(1 + 1/n)).
+Measured false-positive rate on pure noise (seed=1234, 100k trials/row):
+n=3 22.7%, n=4 16.9%, n=5 14.4%, n=8 10.3%, n=15 7.1%, n=30 5.8% (nominal 5%).
+
+The decision rule is now the two-sided 95% prediction interval for one new
+observation:  |x - mean| / (s * sqrt(1 + 1/n)) > t_{0.975, n-1}.
+Under iid Gaussian readings this has ~5% false-positive rate at every n
+(verified by seeded simulation in tests/test_personalized_anomaly.py). Real
+patient data are autocorrelated/non-Gaussian, so this is a screening aid
+with an honest nominal error rate, not a validated change-point detector.
 """
 from __future__ import annotations
 
+import math
 import statistics
 
 MIN_READINGS_FOR_STATS = 3
-DEFAULT_Z_THRESHOLD = 2.0
+CONFIDENCE_LEVEL = 0.95
+# Relative tolerance below which a deviation from a perfectly constant
+# history is treated as rounding noise (heuristic, documented).
+ZERO_VARIANCE_REL_TOL = 0.05
+ZERO_VARIANCE_ABS_TOL = 1e-6
+
+# Two-sided 95% Student-t critical values, d.f. 1..30 (standard table).
+_T_975 = {
+    1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
+    11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093,
+    20: 2.086, 21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048,
+    29: 2.045, 30: 2.042,
+}
+
+
+def t_critical_95(df: int) -> float:
+    if df in _T_975:
+        return _T_975[df]
+    # df > 30: Cornish-Fisher style approximation, accurate to ~3 decimals.
+    z = 1.959964
+    return z + (z**3 + z) / (4 * df) + (5 * z**5 + 16 * z**3 + 3 * z) / (96 * df**2)
+
+
+def effective_z_threshold(n: int) -> float:
+    """|z| (z = (x-mean)/s) above which a new point lies outside the 95% prediction interval."""
+    return t_critical_95(n - 1) * math.sqrt(1 + 1 / n)
+
+
+def _result(method, n, mean=None, stdev=None, z=None, anomaly=False, threshold=None, note=None):
+    out = {
+        "method": method,
+        "readings_available": n,
+        "readings_required": MIN_READINGS_FOR_STATS,
+        "mean": mean,
+        "stdev": stdev,
+        "z_score": z,
+        "is_anomaly": anomaly,
+        "z_threshold_used": threshold,
+    }
+    if note:
+        out["note"] = note
+    return out
 
 
 def detect_personal_anomaly(
     historical_values: list[float],
     latest_value: float,
-    z_threshold: float = DEFAULT_Z_THRESHOLD,
+    z_threshold: float | None = None,
 ) -> dict:
     """
-    Compares `latest_value` against the patient's OWN historical readings for
-    one metric (never against other patients). Returns a dict with:
-      method              "z_score" | "zero_variance" | "insufficient_history"
-      readings_available  how many prior readings were available
-      readings_required   the minimum needed for a real z-score
-      mean / stdev        the patient's own baseline stats (None if insufficient)
-      z_score             how many of the patient's own std devs away the
-                           latest reading is (None if insufficient or zero variance)
-      is_anomaly          bool
+    Compare `latest_value` against the patient's OWN prior readings.
 
-    Never raises. Insufficient history and zero variance both degrade
-    gracefully to an honest "not enough information" result rather than a
-    fabricated flag or a crash.
+    method: "z_score" | "zero_variance" | "insufficient_history" | "invalid_input"
+    `z_threshold=None` (default) uses the exact 95% prediction-interval
+    threshold for the available history length; pass a number to override.
+
+    Never raises. Non-finite history values are dropped (and counted in
+    `note`); a non-finite `latest_value` yields method "invalid_input".
     """
-    n = len(historical_values)
-    if n < MIN_READINGS_FOR_STATS:
-        return {
-            "method": "insufficient_history",
-            "readings_available": n,
-            "readings_required": MIN_READINGS_FOR_STATS,
-            "mean": None,
-            "stdev": None,
-            "z_score": None,
-            "is_anomaly": False,
-        }
+    try:
+        latest = float(latest_value)
+    except (TypeError, ValueError):
+        return _result("invalid_input", 0, note="latest value is not numeric")
+    if not math.isfinite(latest):
+        return _result("invalid_input", 0, note="latest value is not finite")
 
-    mean = statistics.mean(historical_values)
-    stdev = statistics.stdev(historical_values)  # sample stdev (n-1 denominator)
+    clean: list[float] = []
+    dropped = 0
+    for v in historical_values or []:
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            dropped += 1
+            continue
+        if math.isfinite(fv):
+            clean.append(fv)
+        else:
+            dropped += 1
+    note = f"{dropped} non-finite/non-numeric history value(s) ignored" if dropped else None
+
+    n = len(clean)
+    if n < MIN_READINGS_FOR_STATS:
+        return _result("insufficient_history", n, note=note)
+
+    mean = statistics.fmean(clean)
+    stdev = statistics.stdev(clean)  # sample SD (n-1)
 
     if stdev == 0:
-        # Every historical reading was identical -- a z-score is undefined
-        # (division by zero), but any deviation at all is still meaningful.
-        return {
-            "method": "zero_variance",
-            "readings_available": n,
-            "readings_required": MIN_READINGS_FOR_STATS,
-            "mean": mean,
-            "stdev": 0.0,
-            "z_score": None,
-            "is_anomaly": latest_value != mean,
-        }
+        tol = max(ZERO_VARIANCE_ABS_TOL, ZERO_VARIANCE_REL_TOL * abs(mean))
+        return _result("zero_variance", n, mean=mean, stdev=0.0, anomaly=abs(latest - mean) > tol, note=note)
 
-    z_score = (latest_value - mean) / stdev
-    return {
-        "method": "z_score",
-        "readings_available": n,
-        "readings_required": MIN_READINGS_FOR_STATS,
-        "mean": round(mean, 4),
-        "stdev": round(stdev, 4),
-        "z_score": round(z_score, 4),
-        "is_anomaly": abs(z_score) >= z_threshold,
-    }
-    
+    threshold = z_threshold if z_threshold is not None else effective_z_threshold(n)
+    z = (latest - mean) / stdev
+    return _result("z_score", n, mean=round(mean, 4), stdev=round(stdev, 4), z=round(z, 4),
+                   anomaly=abs(z) >= threshold, threshold=round(threshold, 4), note=note)
